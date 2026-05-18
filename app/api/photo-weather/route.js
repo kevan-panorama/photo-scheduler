@@ -1,0 +1,8 @@
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  return NextResponse.json({
+    weather: "Sunny",
+    temperature: 26,
+  });
+}
