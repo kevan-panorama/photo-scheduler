@@ -1,14 +1,18 @@
-import "./globals.css";
-
-export const metadata = {
-  title: "Photo Scheduler",
-  description: "Real estate photo scheduling dashboard",
-};
-
-export default function RootLayout({ children }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
+{
+  "name": "photo-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.56.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "tailwindcss": "^4.0.0",
+    "next": "^16.2.6",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  }
 }
