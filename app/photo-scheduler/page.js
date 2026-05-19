@@ -49,7 +49,32 @@ const agents = [
   "Walter Fernandez",
 ];
 
-const photographers = ["Marcos", "Cauana"];
+const photographers = [
+  {
+    id: "e45a94ec-c733-49e7-8513-709202bf7652",
+    name: "Kevan",
+    email: "kevan@panorama.es",
+    color: "#123e63",
+  },
+  {
+    id: "REPLACE_WITH_MARCOS_UUID",
+    name: "Marcos",
+    email: "marcos@panorama.es",
+    color: "#2f7898",
+  },
+  {
+    id: "REPLACE_WITH_CAUANA_UUID",
+    name: "Cauana",
+    email: "cauana@panorama.es",
+    color: "#e7d39a",
+  },
+];
+
+const photographerNames = photographers.map((photographer) => photographer.name);
+
+function getPhotographerByName(name) {
+  return photographers.find((photographer) => photographer.name === name);
+}
 const propertyTypes = ["Villa", "Apartment", "Townhouse"];
 
 const serviceOptions = [
@@ -59,6 +84,7 @@ const serviceOptions = [
 ];
 
 const photographerCalendarLinks = {
+  Kevan: "https://calendar.google.com/calendar/u/0/r",
   Marcos: "https://calendar.google.com/calendar/u/0/r?cid=panorama-marcos-calendar",
   Cauana: "https://calendar.google.com/calendar/u/0/r?cid=panorama-cauana-calendar",
 };
@@ -248,6 +274,8 @@ export default function PhotoSchedulerPage() {
   const [filter, setFilter] = useState("This week");
   const [bookingSlot, setBookingSlot] = useState(null);
   const [draggedShootId, setDraggedShootId] = useState(null);
+  const [googleAvailability, setGoogleAvailability] = useState([]);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
 
   useEffect(() => {
     try {
@@ -274,6 +302,31 @@ export default function PhotoSchedulerPage() {
       console.error("Could not save photo scheduler shoots", error);
     }
   }, [shoots, hasLoadedStoredShoots]);
+
+  useEffect(() => {
+    async function loadAvailability() {
+      try {
+        setIsLoadingAvailability(true);
+
+        const response = await fetch("/api/google/availability");
+        const data = await response.json();
+
+        if (data.photographers) {
+          setGoogleAvailability(data.photographers);
+        }
+      } catch (error) {
+        console.error("Availability load failed", error);
+      } finally {
+        setIsLoadingAvailability(false);
+      }
+    }
+
+    loadAvailability();
+
+    const interval = setInterval(loadAvailability, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const stats = useMemo(() => {
     return {
@@ -333,7 +386,7 @@ export default function PhotoSchedulerPage() {
       googlePin: data.googlePin || "",
       city: data.city || "Marbella",
       agent: data.agent || agents[0],
-      photographer: data.photographer || photographers[0],
+      photographer: data.photographer || photographerNames[0],
       status: data.status || "new_request",
       services: data.services?.length ? data.services : ["photos"],
       date: data.date || "Unscheduled",
@@ -356,7 +409,7 @@ export default function PhotoSchedulerPage() {
     setModal("booking");
   }
 
-  function scheduleExistingShoot({ shootId, day, time, photographer }) {
+  function scheduleExistingShoot({ shootId, day, time, photographer, googleEventId, googleEventLink }) {
     const weatherInsight = getWeatherInsight(day, time);
 
     setShoots((old) =>
@@ -371,6 +424,8 @@ export default function PhotoSchedulerPage() {
           date: buildDateLabel(day),
           photographer: photographer || shoot.photographer,
           weather: weatherInsight ? `${weatherInsight.label} · ${weatherInsight.detail}` : "Forecast pending",
+          googleEventId: googleEventId || shoot.googleEventId,
+          googleEventLink: googleEventLink || shoot.googleEventLink,
           notes: shoot.notes || `Scheduled from calendar for ${buildDateLabel(day)} at ${time}.`,
         };
 
@@ -406,7 +461,14 @@ export default function PhotoSchedulerPage() {
           )}
 
           {activeTab === "calendar" && (
-            <CalendarView setModal={setModal} openShoot={openShoot} shoots={shoots} openBookingModal={openBookingModal} />
+            <CalendarView
+              setModal={setModal}
+              openShoot={openShoot}
+              shoots={shoots}
+              openBookingModal={openBookingModal}
+              googleAvailability={googleAvailability}
+              isLoadingAvailability={isLoadingAvailability}
+            />
           )}
 
           {activeTab === "notes" && (
@@ -425,7 +487,91 @@ export default function PhotoSchedulerPage() {
             setBookingSlot(null);
             setModal(null);
           }}
-          onSchedule={scheduleExistingShoot}
+          onSchedule={async (form) => {
+            const selectedShootForBooking = shoots.find(
+              (shoot) => String(shoot.id) === String(form.shootId)
+            );
+
+            const photographer = getPhotographerByName(form.photographer);
+
+            if (!selectedShootForBooking || !photographer) {
+              alert("Please select a property and a connected photographer.");
+              return;
+            }
+
+            if (photographer.id.includes("REPLACE_WITH")) {
+              alert("This photographer does not have a real Supabase UUID yet. Replace the placeholder UUID first.");
+              return;
+            }
+
+            const currentYear = new Date().getFullYear();
+            const calendarDay = calendarDays.find((day) => day.day === form.day);
+
+            if (!calendarDay) {
+              alert("Invalid calendar day.");
+              return;
+            }
+
+            const start = new Date(`${currentYear}-05-${calendarDay.date}T${form.time}:00`);
+            const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+
+            try {
+              const response = await fetch("/api/google/create-event", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  shootId: selectedShootForBooking.id,
+                  photographerId: photographer.id,
+                  start: start.toISOString(),
+                  end: end.toISOString(),
+                  propertyTitle: selectedShootForBooking.title,
+                  ref: selectedShootForBooking.ref,
+                  address: selectedShootForBooking.address,
+                  googlePin: selectedShootForBooking.googlePin,
+                  services: selectedShootForBooking.services,
+                  notes: selectedShootForBooking.notes,
+                  agent: selectedShootForBooking.agent,
+                }),
+              });
+
+              const data = await response.json();
+
+              if (!response.ok) {
+                alert(data.error || "Failed to create Google Calendar event.");
+                return;
+              }
+
+              scheduleExistingShoot({
+                ...form,
+                googleEventId: data.googleEventId,
+                googleEventLink: data.htmlLink,
+              });
+
+              setGoogleAvailability((current) =>
+                current.map((item) => {
+                  if (item.photographerId !== photographer.id) return item;
+
+                  return {
+                    ...item,
+                    busy: [
+                      ...(item.busy || []),
+                      {
+                        start: start.toISOString(),
+                        end: end.toISOString(),
+                      },
+                    ],
+                  };
+                })
+              );
+
+              alert("Google Calendar event created and photographer invited.");
+            } catch (error) {
+              console.error(error);
+              alert("Unexpected scheduling error.");
+            }
+          }}
         />
       )}
 
@@ -623,9 +769,35 @@ function Pipeline({ shoots, openShoot, draggedShootId, setDraggedShootId, moveSh
   );
 }
 
-function CalendarView({ setModal, openShoot, shoots, openBookingModal }) {
+function CalendarView({
+  setModal,
+  openShoot,
+  shoots,
+  openBookingModal,
+  googleAvailability,
+  isLoadingAvailability,
+}) {
   function getShootForSlot(day, time) {
     return shoots.find((shoot) => shoot.day === day && shoot.time === time);
+  }
+
+  function busyPhotographersForSlot(day, time) {
+    const currentYear = new Date().getFullYear();
+    const calendarDay = calendarDays.find((item) => item.day === day);
+
+    if (!calendarDay) return [];
+
+    const slotStart = new Date(`${currentYear}-05-${calendarDay.date}T${time}:00`);
+    const slotEnd = new Date(slotStart.getTime() + 2 * 60 * 60 * 1000);
+
+    return (googleAvailability || []).filter((photographer) => {
+      return (photographer.busy || []).some((busy) => {
+        const busyStart = new Date(busy.start);
+        const busyEnd = new Date(busy.end);
+
+        return slotStart < busyEnd && slotEnd > busyStart;
+      });
+    });
   }
 
   return (
@@ -633,12 +805,42 @@ function CalendarView({ setModal, openShoot, shoots, openBookingModal }) {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h3 className="text-[34px] font-semibold tracking-[-0.03em] text-[#123e63]">Photographer Calendar</h3>
-          <p className="mt-1 text-sm text-[#46667b]">Click a slot, choose a property from the pipeline, then schedule it.</p>
+          <p className="mt-1 text-sm text-[#46667b]">
+            Click a free slot, choose a property, then create a real Google Calendar booking.
+          </p>
+          <p className="mt-2 text-xs font-semibold text-[#6d8ca0]">
+            {isLoadingAvailability ? "Refreshing Google availability..." : "Google availability refreshes every minute."}
+          </p>
         </div>
         <div className="flex gap-2">
           <button className="rounded-2xl bg-[#123e63] px-5 py-3 text-sm font-semibold text-white">Week</button>
           <button onClick={() => setModal("calendar")} className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-5 py-3 text-sm font-semibold text-[#123e63]">Sync Google</button>
         </div>
+      </div>
+
+      <div className="mb-5 grid gap-3 md:grid-cols-3">
+        {(googleAvailability || []).map((photographer) => (
+          <div key={photographer.photographerId} className="rounded-[24px] border border-[#d7e1e7] bg-[#f8fbfc] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-[#123e63]">{photographer.photographerName}</p>
+                <p className="mt-1 text-xs text-[#6d8ca0]">{photographer.email || "No email"}</p>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase ${photographer.connected ? "bg-[#dcebf2] text-[#123e63]" : "bg-[#fff1ee] text-[#9f3d2f]"}`}>
+                {photographer.connected ? "Connected" : "Needs sync"}
+              </span>
+            </div>
+            <p className="mt-3 text-xs font-semibold text-[#2f7898]">
+              {(photographer.busy || []).length} busy block{(photographer.busy || []).length === 1 ? "" : "s"} found
+            </p>
+          </div>
+        ))}
+
+        {!googleAvailability?.length && (
+          <div className="rounded-[24px] border border-dashed border-[#c9dbe5] bg-[#f8fbfc] p-4 text-sm font-semibold text-[#6d8ca0]">
+            No connected Google Calendars loaded yet.
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-[90px_repeat(7,1fr)] overflow-hidden rounded-[28px] border border-[#d7e1e7]">
@@ -658,6 +860,7 @@ function CalendarView({ setModal, openShoot, shoots, openBookingModal }) {
               const shoot = getShootForSlot(day.day, time);
               const availability = availabilityEvents.find((event) => event.day === day.day && event.time === time);
               const weather = getWeatherInsight(day.day, time);
+              const busyPhotographers = busyPhotographersForSlot(day.day, time);
 
               return (
                 <div key={`${day.day}-${time}`} className="relative min-h-[128px] border-l border-t border-[#d7e1e7] bg-white p-2">
@@ -669,7 +872,20 @@ function CalendarView({ setModal, openShoot, shoots, openBookingModal }) {
                       </div>
                       <p className="mt-1 text-sm font-semibold leading-tight">{propertyDisplayTitle(shoot)}</p>
                       <p className="mt-1 text-[11px] text-white/70">{serviceLabels(shoot.services)}</p>
+                      {shoot.googleEventLink && (
+                        <a href={shoot.googleEventLink} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="mt-2 inline-block text-[10px] font-bold text-[#e7d39a] underline">
+                          Open Google event
+                        </a>
+                      )}
                     </button>
+                  ) : busyPhotographers.length ? (
+                    <div className="w-full rounded-[20px] bg-[#f2d6d2] p-3 text-left">
+                      <p className="text-xs font-bold text-[#9f3d2f]">Busy</p>
+                      <p className="mt-1 text-sm font-semibold text-[#123e63]">
+                        {busyPhotographers.map((photographer) => photographer.photographerName).join(" · ")}
+                      </p>
+                      <p className="mt-1 text-[11px] text-[#6d8ca0]">Google Calendar blocked</p>
+                    </div>
                   ) : availability ? (
                     <button
                       onClick={() => (availability.type === "busy" ? null : openBookingModal({ day: day.day, time }))}
@@ -836,7 +1052,7 @@ function ShootDetailsDrawer({ shoot, onClose, updateSelected, onDelete }) {
           <label>
             <span className="mb-2 block text-sm font-semibold text-[#46667b]">Assigned Photographer</span>
             <select value={shoot.photographer} onChange={(e) => updateSelected("photographer", e.target.value)} className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm text-[#123e63] outline-none">
-              {photographers.map((p) => <option key={p}>{p}</option>)}
+              {photographerNames.map((p) => <option key={p}>{p}</option>)}
             </select>
           </label>
 
@@ -881,7 +1097,7 @@ function NewShootModal({ onClose, onCreate }) {
     notes: "",
     services: ["photos"],
     agent: agents[0],
-    photographer: photographers[0],
+    photographer: photographerNames[0],
     status: "new_request",
     priority: "Normal",
     deliveryLink: "",
@@ -914,7 +1130,7 @@ function NewShootModal({ onClose, onCreate }) {
         </select>
 
         <select value={form.photographer} onChange={(e) => update("photographer", e.target.value)} className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none">
-          {photographers.map((p) => <option key={p}>{p}</option>)}
+          {photographerNames.map((p) => <option key={p}>{p}</option>)}
         </select>
 
         <button onClick={() => onCreate(form)} className="mt-3 rounded-2xl bg-[#123e63] px-5 py-4 text-sm font-semibold text-white">Create card in pipeline</button>
@@ -928,7 +1144,7 @@ function BookingModal({ slot, shoots, onClose, onSchedule }) {
   const fallbackShoot = scheduleableShoots[0] || shoots[0];
   const [form, setForm] = useState({
     shootId: fallbackShoot?.id || "",
-    photographer: fallbackShoot?.photographer || photographers[0],
+    photographer: fallbackShoot?.photographer || photographerNames[0],
     day: slot.day,
     time: slot.time,
   });
@@ -983,7 +1199,7 @@ function BookingModal({ slot, shoots, onClose, onSchedule }) {
         <label>
           <span className="mb-2 block text-sm font-semibold text-[#46667b]">Assign / confirm photographer</span>
           <select value={form.photographer} onChange={(e) => update("photographer", e.target.value)} className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none">
-            {photographers.map((p) => <option key={p}>{p}</option>)}
+            {photographerNames.map((p) => <option key={p}>{p}</option>)}
           </select>
         </label>
 
@@ -997,14 +1213,14 @@ function CalendarShareModal({ onClose }) {
   return (
     <BasicModal title="Photographer Calendar Sharing" onClose={onClose}>
       <div className="grid gap-4">
-        {photographers.map((photographer) => (
+        {photographerNames.map((photographer) => (
           <div key={photographer} className="rounded-[26px] border border-[#d7e1e7] bg-[#f8fbfc] p-4">
             <p className="text-[18px] font-semibold text-[#123e63]">{photographer}</p>
             <p className="mt-1 text-sm text-[#46667b]">Share this Google Calendar link so availability can be managed externally.</p>
             <a href={photographerCalendarLinks[photographer]} target="_blank" rel="noreferrer" className="mt-3 inline-block rounded-2xl bg-white px-4 py-3 text-sm font-bold text-[#2f7898] hover:bg-[#dcebf2]">Open calendar link</a>
           </div>
         ))}
-        <p className="text-xs leading-relaxed text-[#6d8ca0]">Future backend step: replace these placeholder links with real Google Calendar OAuth, editable availability events, and two-way sync.</p>
+        <p className="text-xs leading-relaxed text-[#6d8ca0]">Backend is now connected to Google Calendar. Busy slots are pulled from Google and booking creates real Google Calendar events.</p>
       </div>
     </BasicModal>
   );
