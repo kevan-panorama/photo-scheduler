@@ -210,22 +210,31 @@ const initialShoots = [
   },
 ];
 
-const calendarDays = [
-  { day: "Mon", date: "20" },
-  { day: "Tue", date: "21" },
-  { day: "Wed", date: "22" },
-  { day: "Thu", date: "23" },
-  { day: "Fri", date: "24" },
-  { day: "Sat", date: "25" },
-  { day: "Sun", date: "26" },
-];
+function buildCurrentWeekDays() {
+  const today = new Date();
+  const currentDay = today.getDay();
+  const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
 
-const availabilityEvents = [
-  { day: "Mon", time: "10:00", title: "Marcos available", type: "available" },
-  { day: "Thu", time: "12:00", title: "Cauana available", type: "available" },
-  { day: "Fri", time: "18:00", title: "Golden hour slot", type: "available" },
-  { day: "Sat", time: "10:00", title: "Blocked", type: "busy" },
-];
+  const monday = new Date(today);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(today.getDate() + mondayOffset);
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+
+    return {
+      day: date.toLocaleDateString("en-US", { weekday: "short" }),
+      date: date.toLocaleDateString("en-US", { day: "2-digit" }),
+      month: date.toLocaleDateString("en-US", { month: "short" }),
+      isoDate: date.toISOString().slice(0, 10),
+    };
+  });
+}
+
+const calendarDays = buildCurrentWeekDays();
+
+const availabilityEvents = [];
 
 const timeSlots = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"];
 
@@ -308,7 +317,12 @@ export default function PhotoSchedulerPage() {
       try {
         setIsLoadingAvailability(true);
 
-        const response = await fetch("/api/google/availability");
+        const weekStart = new Date(`${calendarDays[0].isoDate}T00:00:00`);
+        const weekEnd = new Date(`${calendarDays[6].isoDate}T23:59:59`);
+
+        const response = await fetch(
+          `/api/google/availability?start=${encodeURIComponent(weekStart.toISOString())}&end=${encodeURIComponent(weekEnd.toISOString())}`
+        );
         const data = await response.json();
 
         if (data.photographers) {
@@ -504,7 +518,6 @@ export default function PhotoSchedulerPage() {
               return;
             }
 
-            const currentYear = new Date().getFullYear();
             const calendarDay = calendarDays.find((day) => day.day === form.day);
 
             if (!calendarDay) {
@@ -512,7 +525,7 @@ export default function PhotoSchedulerPage() {
               return;
             }
 
-            const start = new Date(`${currentYear}-05-${calendarDay.date}T${form.time}:00`);
+            const start = new Date(`${calendarDay.isoDate}T${form.time}:00`);
             const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
 
             try {
@@ -782,12 +795,11 @@ function CalendarView({
   }
 
   function busyPhotographersForSlot(day, time) {
-    const currentYear = new Date().getFullYear();
     const calendarDay = calendarDays.find((item) => item.day === day);
 
     if (!calendarDay) return [];
 
-    const slotStart = new Date(`${currentYear}-05-${calendarDay.date}T${time}:00`);
+    const slotStart = new Date(`${calendarDay.isoDate}T${time}:00`);
     const slotEnd = new Date(slotStart.getTime() + 2 * 60 * 60 * 1000);
 
     return (googleAvailability || []).filter((photographer) => {
@@ -849,6 +861,7 @@ function CalendarView({
           <div key={day.day} className="border-l border-[#d7e1e7] bg-[#f8fbfc] p-4 text-center">
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#2f7898]">{day.day}</p>
             <p className="mt-1 text-[30px] font-semibold text-[#123e63]">{day.date}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#6d8ca0]">{day.month}</p>
           </div>
         ))}
 
