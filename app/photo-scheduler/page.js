@@ -70,9 +70,11 @@ const initialShoots = [
     photographer: "Marcos",
     status: "new_request",
     date: "Unscheduled",
+    day: "",
     time: "Pending",
     weather: "Pending",
     priority: "High",
+    deliveryLink: "",
     notes: "Owner prefers late afternoon light.",
   },
   {
@@ -84,9 +86,11 @@ const initialShoots = [
     photographer: "Cauana",
     status: "needs_confirmation",
     date: "Tue 21",
-    time: "11:30",
+    day: "Tue",
+    time: "10:00",
     weather: "☀️ 24°",
     priority: "Normal",
+    deliveryLink: "",
     notes: "Confirm access with concierge.",
   },
   {
@@ -98,9 +102,11 @@ const initialShoots = [
     photographer: "Marcos",
     status: "scheduled",
     date: "Wed 22",
+    day: "Wed",
     time: "16:00",
     weather: "🌤️ 22°",
     priority: "Normal",
+    deliveryLink: "",
     notes: "Terrace must be staged before arrival.",
   },
   {
@@ -111,11 +117,29 @@ const initialShoots = [
     agent: "Lindsey Medina PRRE",
     photographer: "Cauana",
     status: "shoot_done",
-    date: "Today",
-    time: "18:30",
+    date: "Fri 24",
+    day: "Fri",
+    time: "18:00",
     weather: "☀️ 25°",
     priority: "Urgent",
+    deliveryLink: "",
     notes: "Send selects to editor today.",
+  },
+  {
+    id: 5,
+    title: "Villa Cascada",
+    address: "Cascada de Camoján",
+    city: "Marbella",
+    agent: "Christopher Clover",
+    photographer: "Marcos",
+    status: "delivered",
+    date: "Mon 20",
+    day: "Mon",
+    time: "12:00",
+    weather: "☀️ 23°",
+    priority: "Normal",
+    deliveryLink: "https://drive.google.com/",
+    notes: "Final gallery delivered to agent.",
   },
 ];
 
@@ -129,16 +153,27 @@ const calendarDays = [
   { day: "Sun", date: "26" },
 ];
 
-const calendarEvents = [
+const availabilityEvents = [
   { day: "Mon", time: "10:00", title: "Marcos available", type: "available" },
-  { day: "Tue", time: "11:30", title: "Penthouse Puente Romano", type: "shoot" },
-  { day: "Wed", time: "16:00", title: "Townhouse La Quinta", type: "shoot" },
   { day: "Thu", time: "12:00", title: "Cauana available", type: "available" },
-  { day: "Fri", time: "18:30", title: "Golden hour slot", type: "available" },
-  { day: "Sat", time: "09:00", title: "Blocked", type: "busy" },
+  { day: "Fri", time: "18:00", title: "Golden hour slot", type: "available" },
+  { day: "Sat", time: "10:00", title: "Blocked", type: "busy" },
 ];
 
 const timeSlots = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"];
+
+function statusLabel(status) {
+  return pipelineColumns.find((column) => column.key === status)?.label || status;
+}
+
+function dayLabel(day) {
+  return calendarDays.find((calendarDay) => calendarDay.day === day);
+}
+
+function buildDateLabel(day) {
+  const match = dayLabel(day);
+  return match ? `${match.day} ${match.date}` : "Unscheduled";
+}
 
 export default function PhotoSchedulerPage() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -146,6 +181,8 @@ export default function PhotoSchedulerPage() {
   const [selectedShoot, setSelectedShoot] = useState(initialShoots[0]);
   const [modal, setModal] = useState(null);
   const [filter, setFilter] = useState("This week");
+  const [bookingSlot, setBookingSlot] = useState(null);
+  const [draggedShootId, setDraggedShootId] = useState(null);
 
   const stats = useMemo(() => {
     return {
@@ -173,25 +210,66 @@ export default function PhotoSchedulerPage() {
     setModal("details");
   }
 
-  function createMockShoot() {
+  function moveShootToStatus(shootId, nextStatus) {
+    setShoots((old) =>
+      old.map((shoot) => {
+        if (shoot.id !== shootId) return shoot;
+
+        const updated = {
+          ...shoot,
+          status: nextStatus,
+          deliveryLink:
+            nextStatus === "delivered" && !shoot.deliveryLink
+              ? "https://drive.google.com/"
+              : shoot.deliveryLink,
+        };
+
+        setSelectedShoot((current) =>
+          current?.id === shootId ? updated : current
+        );
+
+        return updated;
+      })
+    );
+  }
+
+  function createShootFromData(data) {
     const newShoot = {
-      id: shoots.length + 1,
-      title: "New Property Shoot",
-      address: "Address pending",
-      city: "Marbella",
-      agent: agents[0],
-      photographer: "Marcos",
-      status: "new_request",
-      date: "Unscheduled",
-      time: "Pending",
-      weather: "Pending",
-      priority: "Normal",
-      notes: "New shoot created from mock modal.",
+      id: Date.now(),
+      title: data.title || "New Property Shoot",
+      address: data.address || "Address pending",
+      city: data.city || "Marbella",
+      agent: data.agent || agents[0],
+      photographer: data.photographer || photographers[0],
+      status: data.status || "new_request",
+      date: data.date || "Unscheduled",
+      day: data.day || "",
+      time: data.time || "Pending",
+      weather: data.weather || "Pending",
+      priority: data.priority || "Normal",
+      deliveryLink: data.deliveryLink || "",
+      notes: data.notes || "New shoot created from dashboard.",
     };
 
-    setShoots([newShoot, ...shoots]);
+    setShoots((old) => [newShoot, ...old]);
     setSelectedShoot(newShoot);
     setModal("details");
+  }
+
+  function openBookingModal(slot) {
+    setBookingSlot(slot);
+    setModal("booking");
+  }
+
+  function createCalendarBooking(data) {
+    createShootFromData({
+      ...data,
+      status: "scheduled",
+      date: buildDateLabel(data.day),
+      weather: "Pending",
+      notes: `Booked from calendar for ${buildDateLabel(data.day)} at ${data.time}.`,
+    });
+    setBookingSlot(null);
   }
 
   return (
@@ -224,6 +302,9 @@ export default function PhotoSchedulerPage() {
             <Pipeline
               shoots={shoots}
               openShoot={openShoot}
+              draggedShootId={draggedShootId}
+              setDraggedShootId={setDraggedShootId}
+              moveShootToStatus={moveShootToStatus}
             />
           )}
 
@@ -232,6 +313,7 @@ export default function PhotoSchedulerPage() {
               setModal={setModal}
               openShoot={openShoot}
               shoots={shoots}
+              openBookingModal={openBookingModal}
             />
           )}
 
@@ -248,7 +330,18 @@ export default function PhotoSchedulerPage() {
       {modal === "new" && (
         <NewShootModal
           onClose={() => setModal(null)}
-          onCreate={createMockShoot}
+          onCreate={createShootFromData}
+        />
+      )}
+
+      {modal === "booking" && bookingSlot && (
+        <BookingModal
+          slot={bookingSlot}
+          onClose={() => {
+            setBookingSlot(null);
+            setModal(null);
+          }}
+          onCreate={createCalendarBooking}
         />
       )}
 
@@ -433,8 +526,8 @@ function Overview({ stats, shoots, setActiveTab, openShoot }) {
           </h3>
 
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/75">
-            The calendar will show photographer availability, booking blocks,
-            confirmations and conflicts.
+            Empty calendar slots now open a booking modal and automatically add
+            scheduled shoots into the production pipeline.
           </p>
         </div>
       </section>
@@ -443,7 +536,10 @@ function Overview({ stats, shoots, setActiveTab, openShoot }) {
     </div>
   );
 }
+
 function OverviewRightPanel({ shoots, openShoot }) {
+  const upcoming = shoots.filter((shoot) => shoot.status === "scheduled");
+
   return (
     <aside className="rounded-[34px] border border-[#d7e1e7] bg-white p-6 shadow-[0_20px_60px_rgba(18,62,99,0.08)]">
       <h3 className="text-[28px] font-semibold tracking-[-0.03em] text-[#123e63]">
@@ -451,13 +547,13 @@ function OverviewRightPanel({ shoots, openShoot }) {
       </h3>
 
       <div className="mt-5 space-y-3">
-        {shoots.map((shoot) => (
+        {(upcoming.length ? upcoming : shoots).map((shoot) => (
           <button
             key={shoot.id}
             onClick={() => openShoot(shoot)}
             className="w-full rounded-[26px] border border-[#d7e1e7] bg-[#f8fbfc] p-4 text-left transition hover:bg-[#dcebf2]"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <p className="text-[17px] font-semibold text-[#123e63]">
                 {shoot.title}
               </p>
@@ -468,7 +564,7 @@ function OverviewRightPanel({ shoots, openShoot }) {
             </div>
 
             <p className="mt-2 text-sm text-[#46667b]">
-              {shoot.agent}
+              {shoot.agent} · {shoot.photographer}
             </p>
           </button>
         ))}
@@ -477,9 +573,30 @@ function OverviewRightPanel({ shoots, openShoot }) {
   );
 }
 
-function Pipeline({ shoots, openShoot }) {
+function Pipeline({
+  shoots,
+  openShoot,
+  draggedShootId,
+  setDraggedShootId,
+  moveShootToStatus,
+}) {
   return (
     <div className="overflow-x-auto rounded-[34px] border border-[#d7e1e7] bg-white p-5 shadow-[0_20px_60px_rgba(18,62,99,0.08)]">
+      <div className="mb-4 flex items-center justify-between px-1">
+        <div>
+          <h3 className="text-[28px] font-semibold tracking-[-0.03em] text-[#123e63]">
+            Visual Production Pipeline
+          </h3>
+          <p className="mt-1 text-sm text-[#46667b]">
+            Drag cards between stages to update the shoot status instantly.
+          </p>
+        </div>
+
+        <span className="rounded-full bg-[#dcebf2] px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-[#123e63]">
+          Drag enabled
+        </span>
+      </div>
+
       <div className="flex min-w-[1400px] gap-4">
         {pipelineColumns.map((column) => {
           const columnShoots = shoots.filter(
@@ -489,7 +606,12 @@ function Pipeline({ shoots, openShoot }) {
           return (
             <div
               key={column.key}
-              className="min-h-[720px] w-[300px] shrink-0 rounded-[30px] bg-[#f8fbfc] p-4"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={() => {
+                if (draggedShootId) moveShootToStatus(draggedShootId, column.key);
+                setDraggedShootId(null);
+              }}
+              className="min-h-[720px] w-[300px] shrink-0 rounded-[30px] bg-[#f8fbfc] p-4 transition hover:bg-[#eef6f9]"
             >
               <div className="mb-5 flex items-center justify-between">
                 <h3 className="text-[16px] font-semibold text-[#123e63]">
@@ -506,6 +628,9 @@ function Pipeline({ shoots, openShoot }) {
                   <ShootCard
                     key={shoot.id}
                     shoot={shoot}
+                    draggable
+                    onDragStart={() => setDraggedShootId(shoot.id)}
+                    onDragEnd={() => setDraggedShootId(null)}
                     onClick={() => openShoot(shoot)}
                   />
                 ))}
@@ -524,7 +649,11 @@ function Pipeline({ shoots, openShoot }) {
   );
 }
 
-function CalendarView({ setModal }) {
+function CalendarView({ setModal, openShoot, shoots, openBookingModal }) {
+  function getShootForSlot(day, time) {
+    return shoots.find((shoot) => shoot.day === day && shoot.time === time);
+  }
+
   return (
     <div className="rounded-[34px] border border-[#d7e1e7] bg-white p-6 shadow-[0_20px_60px_rgba(18,62,99,0.08)]">
       <div className="mb-5 flex items-center justify-between">
@@ -534,7 +663,7 @@ function CalendarView({ setModal }) {
           </h3>
 
           <p className="mt-1 text-sm text-[#46667b]">
-            Weekly booking overview connected to photographer availability.
+            Click an empty slot to create a booking and place it into Scheduled.
           </p>
         </div>
 
@@ -571,58 +700,80 @@ function CalendarView({ setModal }) {
         ))}
 
         {timeSlots.map((time) => (
-          <>
-            <div
-              key={`${time}-label`}
-              className="border-t border-[#d7e1e7] bg-[#f8fbfc] p-3 text-xs font-semibold text-[#2f7898]"
-            >
+          <div key={`row-${time}`} className="contents">
+            <div className="border-t border-[#d7e1e7] bg-[#f8fbfc] p-3 text-xs font-semibold text-[#2f7898]">
               {time}
             </div>
 
             {calendarDays.map((day) => {
-              const event = calendarEvents.find(
-                (e) => e.day === day.day && e.time === time
+              const shoot = getShootForSlot(day.day, time);
+              const availability = availabilityEvents.find(
+                (event) => event.day === day.day && event.time === time
               );
 
               return (
                 <div
                   key={`${day.day}-${time}`}
-                  className="relative min-h-[110px] border-l border-t border-[#d7e1e7] bg-white p-2"
+                  className="relative min-h-[118px] border-l border-t border-[#d7e1e7] bg-white p-2"
                 >
-                  {event && (
+                  {shoot ? (
                     <button
+                      onClick={() => openShoot(shoot)}
+                      className="w-full rounded-[20px] bg-[#123e63] p-3 text-left text-white shadow-sm transition hover:scale-[1.02]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold">{shoot.time}</p>
+                        <span className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-semibold">
+                          {shoot.photographer}
+                        </span>
+                      </div>
+
+                      <p className="mt-1 text-sm font-semibold leading-tight">
+                        {shoot.title}
+                      </p>
+
+                      <p className="mt-1 text-[11px] text-white/70">
+                        {shoot.agent}
+                      </p>
+                    </button>
+                  ) : availability ? (
+                    <button
+                      onClick={() =>
+                        availability.type === "busy"
+                          ? null
+                          : openBookingModal({ day: day.day, time })
+                      }
                       className={`w-full rounded-[20px] p-3 text-left shadow-sm transition hover:scale-[1.02] ${
-                        event.type === "shoot"
-                          ? "bg-[#123e63] text-white"
-                          : event.type === "available"
+                        availability.type === "available"
                           ? "bg-[#dcebf2] text-[#123e63]"
                           : "bg-[#e7d39a] text-[#123e63]"
                       }`}
                     >
-                      <p className="text-xs font-bold">
-                        {event.time}
-                      </p>
+                      <p className="text-xs font-bold">{time}</p>
 
                       <p className="mt-1 text-sm font-semibold leading-tight">
-                        {event.title}
+                        {availability.title}
                       </p>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => openBookingModal({ day: day.day, time })}
+                      className="h-full min-h-[96px] w-full rounded-[20px] border border-dashed border-transparent p-3 text-left text-xs font-semibold text-[#9ab0bd] transition hover:border-[#c9dbe5] hover:bg-[#f8fbfc] hover:text-[#2f7898]"
+                    >
+                      + Book slot
                     </button>
                   )}
                 </div>
               );
             })}
-          </>
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-function NotesView({
-  shoots,
-  selectedShoot,
-  setSelectedShoot,
-}) {
+function NotesView({ shoots, selectedShoot, setSelectedShoot }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
       <aside className="rounded-[34px] border border-[#d7e1e7] bg-white p-5 shadow-[0_20px_60px_rgba(18,62,99,0.08)]">
@@ -641,13 +792,9 @@ function NotesView({
                   : "bg-[#f8fbfc] text-[#123e63]"
               }`}
             >
-              <p className="text-[19px] font-semibold">
-                {shoot.title}
-              </p>
+              <p className="text-[19px] font-semibold">{shoot.title}</p>
 
-              <p className="mt-1 text-sm opacity-70">
-                {shoot.city}
-              </p>
+              <p className="mt-1 text-sm opacity-70">{shoot.city}</p>
             </button>
           ))}
         </div>
@@ -663,20 +810,9 @@ function NotesView({
         </p>
 
         <div className="mt-8 space-y-3">
-          <Note
-            author="Agent"
-            text={selectedShoot.notes}
-          />
-
-          <Note
-            author="Photographer"
-            text="Golden hour recommended around 18:00."
-          />
-
-          <Note
-            author="Team"
-            text="Drone weather check pending."
-          />
+          <Note author="Agent" text={selectedShoot.notes} />
+          <Note author="Photographer" text="Golden hour recommended around 18:00." />
+          <Note author="Team" text="Drone weather check pending." />
         </div>
 
         <div className="mt-6 flex gap-3 rounded-[28px] bg-[#f8fbfc] p-3">
@@ -694,40 +830,79 @@ function NotesView({
   );
 }
 
-function ShootCard({ shoot, onClick }) {
+function ShootCard({
+  shoot,
+  onClick,
+  draggable = false,
+  onDragStart,
+  onDragEnd,
+}) {
   return (
     <button
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       onClick={onClick}
-      className="rounded-[30px] border border-[#d7e1e7] bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+      className="w-full cursor-pointer rounded-[26px] border border-[#d7e1e7] bg-white p-4 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg active:cursor-grabbing"
     >
-      <div className="mb-5 h-28 rounded-[24px] bg-gradient-to-br from-[#2f7898] to-[#123e63]" />
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#2f7898]">
+            {statusLabel(shoot.status)}
+          </p>
 
-      <h3 className="text-[24px] font-semibold leading-tight tracking-[-0.03em] text-[#123e63]">
-        {shoot.title}
-      </h3>
+          <h3 className="mt-2 text-[21px] font-semibold leading-tight tracking-[-0.03em] text-[#123e63]">
+            {shoot.title}
+          </h3>
+        </div>
 
-      <p className="mt-2 text-sm text-[#46667b]">
-        {shoot.city}
+        <span className="rounded-full bg-[#f8fbfc] px-3 py-1 text-[11px] font-semibold text-[#46667b]">
+          {shoot.priority}
+        </span>
+      </div>
+
+      <p className="text-sm text-[#46667b]">
+        {shoot.city} · {shoot.address}
       </p>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        <span className="rounded-full bg-[#dcebf2] px-3 py-1 text-xs font-semibold text-[#123e63]">
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold">
+        <span className="rounded-2xl bg-[#dcebf2] px-3 py-2 text-[#123e63]">
           {shoot.date}
         </span>
 
-        <span className="rounded-full bg-[#e7d39a] px-3 py-1 text-xs font-semibold text-[#123e63]">
+        <span className="rounded-2xl bg-[#f8fbfc] px-3 py-2 text-[#123e63]">
+          {shoot.time}
+        </span>
+
+        <span className="rounded-2xl bg-[#e7d39a] px-3 py-2 text-[#123e63]">
           {shoot.weather}
         </span>
+
+        <span className="rounded-2xl bg-[#f8fbfc] px-3 py-2 text-[#123e63]">
+          {shoot.photographer}
+        </span>
       </div>
+
+      <p className="mt-4 text-xs leading-relaxed text-[#6d8ca0]">
+        Agent: {shoot.agent}
+      </p>
+
+      {shoot.status === "delivered" && shoot.deliveryLink && (
+        <a
+          href={shoot.deliveryLink}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(event) => event.stopPropagation()}
+          className="mt-4 block rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-3 py-2 text-center text-xs font-bold text-[#2f7898] hover:bg-[#dcebf2]"
+        >
+          Open delivery folder
+        </a>
+      )}
     </button>
   );
 }
 
-function ShootDetailsDrawer({
-  shoot,
-  onClose,
-  updateSelected,
-}) {
+function ShootDetailsDrawer({ shoot, onClose, updateSelected }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-sm">
       <div className="h-full w-[520px] overflow-y-auto bg-white p-7 shadow-2xl">
@@ -750,9 +925,7 @@ function ShootDetailsDrawer({
           </button>
         </div>
 
-        <div className="mt-6 h-56 rounded-[30px] bg-gradient-to-br from-[#2f7898] to-[#123e63]" />
-
-        <div className="mt-7 space-y-4">
+        <div className="mt-7 space-y-4 rounded-[30px] border border-[#d7e1e7] bg-[#f8fbfc] p-5">
           <InfoRow label="Address" value={shoot.address} />
           <InfoRow label="City" value={shoot.city} />
           <InfoRow label="Date" value={shoot.date} />
@@ -764,14 +937,24 @@ function ShootDetailsDrawer({
         <div className="mt-8 grid gap-4">
           <label>
             <span className="mb-2 block text-sm font-semibold text-[#46667b]">
+              Property Title
+            </span>
+
+            <input
+              value={shoot.title}
+              onChange={(e) => updateSelected("title", e.target.value)}
+              className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm text-[#123e63] outline-none"
+            />
+          </label>
+
+          <label>
+            <span className="mb-2 block text-sm font-semibold text-[#46667b]">
               Assign Agent
             </span>
 
             <select
               value={shoot.agent}
-              onChange={(e) =>
-                updateSelected("agent", e.target.value)
-              }
+              onChange={(e) => updateSelected("agent", e.target.value)}
               className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm text-[#123e63] outline-none"
             >
               {agents.map((agent) => (
@@ -787,9 +970,7 @@ function ShootDetailsDrawer({
 
             <select
               value={shoot.photographer}
-              onChange={(e) =>
-                updateSelected("photographer", e.target.value)
-              }
+              onChange={(e) => updateSelected("photographer", e.target.value)}
               className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm text-[#123e63] outline-none"
             >
               {photographers.map((p) => (
@@ -805,9 +986,7 @@ function ShootDetailsDrawer({
 
             <select
               value={shoot.status}
-              onChange={(e) =>
-                updateSelected("status", e.target.value)
-              }
+              onChange={(e) => updateSelected("status", e.target.value)}
               className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm text-[#123e63] outline-none"
             >
               {pipelineColumns.map((column) => (
@@ -817,9 +996,25 @@ function ShootDetailsDrawer({
               ))}
             </select>
           </label>
+
+          <label>
+            <span className="mb-2 block text-sm font-semibold text-[#46667b]">
+              Dropbox / Google Drive Delivery Link
+            </span>
+
+            <input
+              value={shoot.deliveryLink || ""}
+              onChange={(e) => updateSelected("deliveryLink", e.target.value)}
+              placeholder="https://drive.google.com/... or https://dropbox.com/..."
+              className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm text-[#123e63] outline-none"
+            />
+          </label>
         </div>
 
-        <button className="mt-8 w-full rounded-2xl bg-[#123e63] px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-[#123e63]/20">
+        <button
+          onClick={onClose}
+          className="mt-8 w-full rounded-2xl bg-[#123e63] px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-[#123e63]/20"
+        >
           Save Updates
         </button>
       </div>
@@ -828,33 +1023,66 @@ function ShootDetailsDrawer({
 }
 
 function NewShootModal({ onClose, onCreate }) {
+  const [form, setForm] = useState({
+    title: "",
+    address: "",
+    city: "Marbella",
+    agent: agents[0],
+    photographer: photographers[0],
+    status: "new_request",
+    priority: "Normal",
+  });
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
   return (
     <BasicModal title="Create New Shoot" onClose={onClose}>
       <div className="grid gap-4">
         <input
+          value={form.title}
+          onChange={(e) => update("title", e.target.value)}
           placeholder="Property title"
           className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
         />
 
         <input
+          value={form.address}
+          onChange={(e) => update("address", e.target.value)}
           placeholder="Address"
           className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
         />
 
-        <select className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none">
+        <input
+          value={form.city}
+          onChange={(e) => update("city", e.target.value)}
+          placeholder="City"
+          className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
+        />
+
+        <select
+          value={form.agent}
+          onChange={(e) => update("agent", e.target.value)}
+          className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
+        >
           {agents.map((agent) => (
             <option key={agent}>{agent}</option>
           ))}
         </select>
 
-        <select className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none">
+        <select
+          value={form.photographer}
+          onChange={(e) => update("photographer", e.target.value)}
+          className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
+        >
           {photographers.map((p) => (
             <option key={p}>{p}</option>
           ))}
         </select>
 
         <button
-          onClick={onCreate}
+          onClick={() => onCreate(form)}
           className="mt-3 rounded-2xl bg-[#123e63] px-5 py-4 text-sm font-semibold text-white"
         >
           Create Shoot
@@ -864,11 +1092,110 @@ function NewShootModal({ onClose, onCreate }) {
   );
 }
 
+function BookingModal({ slot, onClose, onCreate }) {
+  const [form, setForm] = useState({
+    title: "",
+    address: "",
+    city: "Marbella",
+    agent: agents[0],
+    photographer: photographers[0],
+    priority: "Normal",
+    day: slot.day,
+    time: slot.time,
+  });
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  return (
+    <BasicModal title="Book Calendar Slot" onClose={onClose}>
+      <div className="mb-5 rounded-[26px] bg-[#f8fbfc] p-4">
+        <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#2f7898]">
+          Selected slot
+        </p>
+        <p className="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-[#123e63]">
+          {buildDateLabel(form.day)} · {form.time}
+        </p>
+      </div>
+
+      <div className="grid gap-4">
+        <input
+          value={form.title}
+          onChange={(e) => update("title", e.target.value)}
+          placeholder="Property title"
+          className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
+        />
+
+        <input
+          value={form.address}
+          onChange={(e) => update("address", e.target.value)}
+          placeholder="Address"
+          className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <select
+            value={form.day}
+            onChange={(e) => update("day", e.target.value)}
+            className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
+          >
+            {calendarDays.map((day) => (
+              <option key={day.day} value={day.day}>
+                {day.day} {day.date}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={form.time}
+            onChange={(e) => update("time", e.target.value)}
+            className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
+          >
+            {timeSlots.map((time) => (
+              <option key={time} value={time}>
+                {time}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <select
+          value={form.agent}
+          onChange={(e) => update("agent", e.target.value)}
+          className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
+        >
+          {agents.map((agent) => (
+            <option key={agent}>{agent}</option>
+          ))}
+        </select>
+
+        <select
+          value={form.photographer}
+          onChange={(e) => update("photographer", e.target.value)}
+          className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none"
+        >
+          {photographers.map((p) => (
+            <option key={p}>{p}</option>
+          ))}
+        </select>
+
+        <button
+          onClick={() => onCreate(form)}
+          className="mt-3 rounded-2xl bg-[#123e63] px-5 py-4 text-sm font-semibold text-white"
+        >
+          Create scheduled shoot
+        </button>
+      </div>
+    </BasicModal>
+  );
+}
+
 function BasicModal({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-      <div className="w-[520px] rounded-[34px] bg-white p-7 shadow-2xl">
-        <div className="mb-5 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-5 backdrop-blur-sm">
+      <div className="w-full max-w-[520px] rounded-[34px] bg-white p-7 shadow-2xl">
+        <div className="mb-5 flex items-center justify-between gap-4">
           <h3 className="text-[30px] font-semibold tracking-[-0.03em] text-[#123e63]">
             {title}
           </h3>
@@ -890,13 +1217,9 @@ function BasicModal({ title, children, onClose }) {
 function Note({ author, text }) {
   return (
     <div className="rounded-[28px] bg-[#f8fbfc] p-5">
-      <p className="text-[16px] font-semibold text-[#123e63]">
-        {author}
-      </p>
+      <p className="text-[16px] font-semibold text-[#123e63]">{author}</p>
 
-      <p className="mt-2 text-sm leading-relaxed text-[#46667b]">
-        {text}
-      </p>
+      <p className="mt-2 text-sm leading-relaxed text-[#46667b]">{text}</p>
     </div>
   );
 }
@@ -927,14 +1250,10 @@ function StatCard({ title, value, dark }) {
 
 function InfoRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between border-b border-[#e4edf2] pb-3">
-      <span className="text-sm font-semibold text-[#46667b]">
-        {label}
-      </span>
+    <div className="flex items-center justify-between border-b border-[#e4edf2] pb-3 last:border-b-0 last:pb-0">
+      <span className="text-sm font-semibold text-[#46667b]">{label}</span>
 
-      <span className="text-sm font-semibold text-[#123e63]">
-        {value}
-      </span>
+      <span className="text-sm font-semibold text-[#123e63]">{value}</span>
     </div>
   );
 }
