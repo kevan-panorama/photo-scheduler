@@ -51,6 +51,62 @@ const agents = [
 
 const photographers = ["Marcos", "Cauana"];
 
+const serviceOptions = [
+  { key: "photos", label: "Photos" },
+  { key: "video", label: "Video" },
+  { key: "drone", label: "Drone photos" },
+];
+
+const photographerCalendarLinks = {
+  Marcos: "https://calendar.google.com/calendar/u/0/r?cid=panorama-marcos-calendar",
+  Cauana: "https://calendar.google.com/calendar/u/0/r?cid=panorama-cauana-calendar",
+};
+
+const weatherInsights = [
+  {
+    day: "Mon",
+    time: "10:00",
+    label: "Soft light",
+    detail: "Clear · 22° · low wind",
+    score: "Best",
+  },
+  {
+    day: "Tue",
+    time: "10:00",
+    label: "Bright sun",
+    detail: "Sunny · 24° · strong contrast",
+    score: "Good",
+  },
+  {
+    day: "Wed",
+    time: "16:00",
+    label: "Golden approach",
+    detail: "Partly cloudy · 22°",
+    score: "Best",
+  },
+  {
+    day: "Thu",
+    time: "12:00",
+    label: "Harsh midday",
+    detail: "Clear · 25° · high sun",
+    score: "Avoid",
+  },
+  {
+    day: "Fri",
+    time: "18:00",
+    label: "Golden hour",
+    detail: "Clear · sunset light",
+    score: "Best",
+  },
+  {
+    day: "Sat",
+    time: "10:00",
+    label: "Rain risk",
+    detail: "Cloudy · possible rain",
+    score: "Risk",
+  },
+];
+
 const pipelineColumns = [
   { key: "new_request", label: "New Request" },
   { key: "needs_confirmation", label: "Needs Confirmation" },
@@ -75,6 +131,7 @@ const initialShoots = [
     weather: "Pending",
     priority: "High",
     deliveryLink: "",
+    services: ["photos", "drone"],
     notes: "Owner prefers late afternoon light.",
   },
   {
@@ -91,6 +148,7 @@ const initialShoots = [
     weather: "☀️ 24°",
     priority: "Normal",
     deliveryLink: "",
+    services: ["photos", "video"],
     notes: "Confirm access with concierge.",
   },
   {
@@ -107,6 +165,7 @@ const initialShoots = [
     weather: "🌤️ 22°",
     priority: "Normal",
     deliveryLink: "",
+    services: ["photos", "video", "drone"],
     notes: "Terrace must be staged before arrival.",
   },
   {
@@ -123,6 +182,7 @@ const initialShoots = [
     weather: "☀️ 25°",
     priority: "Urgent",
     deliveryLink: "",
+    services: ["photos"],
     notes: "Send selects to editor today.",
   },
   {
@@ -139,6 +199,7 @@ const initialShoots = [
     weather: "☀️ 23°",
     priority: "Normal",
     deliveryLink: "https://drive.google.com/",
+    services: ["photos", "drone"],
     notes: "Final gallery delivered to agent.",
   },
 ];
@@ -173,6 +234,18 @@ function dayLabel(day) {
 function buildDateLabel(day) {
   const match = dayLabel(day);
   return match ? `${match.day} ${match.date}` : "Unscheduled";
+}
+
+function serviceLabels(services = []) {
+  if (!services.length) return "Services pending";
+  return services
+    .map((service) => serviceOptions.find((option) => option.key === service)?.label)
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function getWeatherInsight(day, time) {
+  return weatherInsights.find((item) => item.day === day && item.time === time);
 }
 
 export default function PhotoSchedulerPage() {
@@ -242,6 +315,7 @@ export default function PhotoSchedulerPage() {
       agent: data.agent || agents[0],
       photographer: data.photographer || photographers[0],
       status: data.status || "new_request",
+      services: data.services?.length ? data.services : ["photos"],
       date: data.date || "Unscheduled",
       day: data.day || "",
       time: data.time || "Pending",
