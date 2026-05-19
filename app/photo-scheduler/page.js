@@ -84,6 +84,7 @@ const pipelineColumns = [
 const initialShoots = [
   {
     id: 1,
+    ref: "PS-001",
     title: "Villa Nueva Andalucía",
     propertyType: "Villa",
     address: "Nueva Andalucía",
@@ -103,6 +104,7 @@ const initialShoots = [
   },
   {
     id: 2,
+    ref: "PS-002",
     title: "Penthouse Puente Romano",
     propertyType: "Apartment",
     address: "Golden Mile",
@@ -122,6 +124,7 @@ const initialShoots = [
   },
   {
     id: 3,
+    ref: "PS-003",
     title: "Townhouse La Quinta",
     propertyType: "Townhouse",
     address: "La Quinta Golf",
@@ -141,6 +144,7 @@ const initialShoots = [
   },
   {
     id: 4,
+    ref: "PS-004",
     title: "Apartment Puerto Banús",
     propertyType: "Apartment",
     address: "Marina Banús",
@@ -160,6 +164,7 @@ const initialShoots = [
   },
   {
     id: 5,
+    ref: "PS-005",
     title: "Villa Cascada",
     propertyType: "Villa",
     address: "Cascada de Camoján",
@@ -223,6 +228,10 @@ function getWeatherInsight(day, time) {
   return weatherInsights.find((item) => item.day === day && item.time === time);
 }
 
+function propertyDisplayTitle(shoot) {
+  return shoot?.ref ? `${shoot.ref} - ${propertyDisplayTitle(shoot)}` : shoot?.title;
+}
+
 function toggleArrayValue(values = [], value) {
   return values.includes(value)
     ? values.filter((item) => item !== value)
@@ -260,6 +269,15 @@ export default function PhotoSchedulerPage() {
     setModal("details");
   }
 
+  function deleteShoot(shootId) {
+    setShoots((old) => {
+      const nextShoots = old.filter((shoot) => shoot.id !== shootId);
+      setSelectedShoot(nextShoots[0] || null);
+      return nextShoots;
+    });
+    setModal(null);
+  }
+
   function moveShootToStatus(shootId, nextStatus) {
     setShoots((old) =>
       old.map((shoot) => {
@@ -280,6 +298,7 @@ export default function PhotoSchedulerPage() {
   function createShootFromData(data) {
     const newShoot = {
       id: Date.now(),
+      ref: data.ref || `PS-${String(shoots.length + 1).padStart(3, "0")}`,
       title: data.title || "New Property Shoot",
       propertyType: data.propertyType || "Villa",
       address: data.address || "Address pending",
@@ -404,7 +423,7 @@ export default function PhotoSchedulerPage() {
       )}
 
       {modal === "details" && selectedShoot && (
-        <ShootDetailsDrawer shoot={selectedShoot} onClose={() => setModal(null)} updateSelected={updateSelected} />
+        <ShootDetailsDrawer shoot={selectedShoot} onClose={() => setModal(null)} updateSelected={updateSelected} onDelete={deleteShoot} />
       )}
     </main>
   );
@@ -513,7 +532,7 @@ function OverviewRightPanel({ shoots, openShoot }) {
         {(upcoming.length ? upcoming : shoots).map((shoot) => (
           <button key={shoot.id} onClick={() => openShoot(shoot)} className="w-full rounded-[26px] border border-[#d7e1e7] bg-[#f8fbfc] p-4 text-left transition hover:bg-[#dcebf2]">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[17px] font-semibold text-[#123e63]">{shoot.title}</p>
+              <p className="text-[17px] font-semibold text-[#123e63]">{propertyDisplayTitle(shoot)}</p>
               <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#2f7898]">{shoot.time}</span>
             </div>
             <p className="mt-2 text-sm text-[#46667b]">{shoot.agent} · {shoot.photographer}</p>
@@ -620,7 +639,7 @@ function CalendarView({ setModal, openShoot, shoots, openBookingModal }) {
                         <p className="text-xs font-bold">{shoot.time}</p>
                         <span className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-semibold">{shoot.photographer}</span>
                       </div>
-                      <p className="mt-1 text-sm font-semibold leading-tight">{shoot.title}</p>
+                      <p className="mt-1 text-sm font-semibold leading-tight">{propertyDisplayTitle(shoot)}</p>
                       <p className="mt-1 text-[11px] text-white/70">{serviceLabels(shoot.services)}</p>
                     </button>
                   ) : availability ? (
@@ -656,7 +675,7 @@ function NotesView({ shoots, selectedShoot, setSelectedShoot, updateSelected }) 
         <div className="mt-5 space-y-3">
           {shoots.map((shoot) => (
             <button key={shoot.id} onClick={() => setSelectedShoot(shoot)} className={`w-full rounded-[28px] p-5 text-left transition ${selectedShoot?.id === shoot.id ? "bg-[#123e63] text-white" : "bg-[#f8fbfc] text-[#123e63]"}`}>
-              <p className="text-[19px] font-semibold">{shoot.title}</p>
+              <p className="text-[19px] font-semibold">{propertyDisplayTitle(shoot)}</p>
               <p className="mt-1 text-sm opacity-70">{shoot.city} · {serviceLabels(shoot.services)}</p>
             </button>
           ))}
@@ -664,7 +683,7 @@ function NotesView({ shoots, selectedShoot, setSelectedShoot, updateSelected }) 
       </aside>
 
       <section className="rounded-[34px] border border-[#d7e1e7] bg-white p-6 shadow-[0_20px_60px_rgba(18,62,99,0.08)]">
-        <h3 className="text-[42px] font-semibold tracking-[-0.04em] text-[#123e63]">{selectedShoot.title}</h3>
+        <h3 className="text-[42px] font-semibold tracking-[-0.04em] text-[#123e63]">{propertyDisplayTitle(selectedShoot)}</h3>
         <p className="mt-2 text-sm text-[#46667b]">Internal notes, confirmations and production updates.</p>
 
         <div className="mt-8 space-y-3">
@@ -694,7 +713,7 @@ function ShootCard({ shoot, onClick, draggable = false, onDragStart, onDragEnd }
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#2f7898]">{statusLabel(shoot.status)}</p>
-          <h3 className="mt-2 text-[21px] font-semibold leading-tight tracking-[-0.03em] text-[#123e63]">{shoot.title}</h3>
+          <h3 className="mt-2 text-[21px] font-semibold leading-tight tracking-[-0.03em] text-[#123e63]">{propertyDisplayTitle(shoot)}</h3>
         </div>
         <span className="rounded-full bg-[#f8fbfc] px-3 py-1 text-[11px] font-semibold text-[#46667b]">{shoot.propertyType}</span>
       </div>
@@ -721,19 +740,20 @@ function ShootCard({ shoot, onClick, draggable = false, onDragStart, onDragEnd }
   );
 }
 
-function ShootDetailsDrawer({ shoot, onClose, updateSelected }) {
+function ShootDetailsDrawer({ shoot, onClose, updateSelected, onDelete }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-sm">
       <div className="h-full w-[560px] overflow-y-auto bg-white p-7 shadow-2xl">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#2f7898]">Property Card Details</p>
-            <h2 className="mt-2 text-[42px] font-semibold leading-[1.02] tracking-[-0.05em] text-[#123e63]">{shoot.title}</h2>
+            <h2 className="mt-2 text-[42px] font-semibold leading-[1.02] tracking-[-0.05em] text-[#123e63]">{propertyDisplayTitle(shoot)}</h2>
           </div>
           <button onClick={onClose} className="rounded-2xl bg-[#f8fbfc] px-4 py-2 text-sm font-semibold text-[#123e63]">Close</button>
         </div>
 
         <div className="mt-7 space-y-4 rounded-[30px] border border-[#d7e1e7] bg-[#f8fbfc] p-5">
+          <InfoRow label="Reference" value={shoot.ref} />
           <InfoRow label="Property type" value={shoot.propertyType} />
           <InfoRow label="Address" value={shoot.address} />
           <InfoRow label="Date" value={shoot.date} />
@@ -744,8 +764,13 @@ function ShootDetailsDrawer({ shoot, onClose, updateSelected }) {
 
         <div className="mt-8 grid gap-4">
           <label>
+            <span className="mb-2 block text-sm font-semibold text-[#46667b]">Reference Number</span>
+            <input value={shoot.ref || ""} onChange={(e) => updateSelected("ref", e.target.value)} placeholder="PS-001" className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm text-[#123e63] outline-none" />
+          </label>
+
+          <label>
             <span className="mb-2 block text-sm font-semibold text-[#46667b]">Property Title</span>
-            <input value={shoot.title} onChange={(e) => updateSelected("title", e.target.value)} className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm text-[#123e63] outline-none" />
+            <input value={propertyDisplayTitle(shoot)} onChange={(e) => updateSelected("title", e.target.value)} className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm text-[#123e63] outline-none" />
           </label>
 
           <label>
@@ -800,7 +825,18 @@ function ShootDetailsDrawer({ shoot, onClose, updateSelected }) {
           </label>
         </div>
 
-        <button onClick={onClose} className="mt-8 w-full rounded-2xl bg-[#123e63] px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-[#123e63]/20">Save Updates</button>
+        <div className="mt-8 grid grid-cols-[1fr_auto] gap-3">
+          <button onClick={onClose} className="rounded-2xl bg-[#123e63] px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-[#123e63]/20">Save Updates</button>
+          <button
+            onClick={() => {
+              const confirmed = window.confirm(`Delete ${propertyDisplayTitle(shoot)} from the pipeline?`);
+              if (confirmed) onDelete(shoot.id);
+            }}
+            className="rounded-2xl border border-[#e7c4bc] bg-[#fff7f5] px-5 py-4 text-sm font-semibold text-[#9f3d2f] hover:bg-[#ffe9e4]"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -808,6 +844,7 @@ function ShootDetailsDrawer({ shoot, onClose, updateSelected }) {
 
 function NewShootModal({ onClose, onCreate }) {
   const [form, setForm] = useState({
+    ref: "",
     title: "",
     propertyType: "Villa",
     address: "",
@@ -829,6 +866,7 @@ function NewShootModal({ onClose, onCreate }) {
   return (
     <BasicModal title="Create New Shoot" onClose={onClose} wide>
       <div className="grid gap-4">
+        <input value={form.ref} onChange={(e) => update("ref", e.target.value)} placeholder="Reference number, e.g. PS-006" className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none" />
         <input value={form.title} onChange={(e) => update("title", e.target.value)} placeholder="Property title" className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none" />
 
         <select value={form.propertyType} onChange={(e) => update("propertyType", e.target.value)} className="rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none">
@@ -889,15 +927,15 @@ function BookingModal({ slot, shoots, onClose, onSchedule }) {
             const nextShoot = shoots.find((shoot) => String(shoot.id) === e.target.value);
             setForm((prev) => ({ ...prev, shootId: e.target.value, photographer: nextShoot?.photographer || prev.photographer }));
           }} className="w-full rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-4 py-3 text-sm outline-none">
-            {scheduleableShoots.map((shoot) => <option key={shoot.id} value={shoot.id}>{shoot.title} · {statusLabel(shoot.status)}</option>)}
-            {!scheduleableShoots.length && shoots.map((shoot) => <option key={shoot.id} value={shoot.id}>{shoot.title}</option>)}
+            {scheduleableShoots.map((shoot) => <option key={shoot.id} value={shoot.id}>{propertyDisplayTitle(shoot)} · {statusLabel(shoot.status)}</option>)}
+            {!scheduleableShoots.length && shoots.map((shoot) => <option key={shoot.id} value={shoot.id}>{propertyDisplayTitle(shoot)}</option>)}
           </select>
         </label>
 
         {selectedShoot && (
           <div className="rounded-[26px] border border-[#d7e1e7] bg-white p-4">
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#2f7898]">Imported property card</p>
-            <h4 className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-[#123e63]">{selectedShoot.title}</h4>
+            <h4 className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-[#123e63]">{propertyDisplayTitle(selectedShoot)}</h4>
             <p className="mt-1 text-sm text-[#46667b]">{selectedShoot.propertyType} · {selectedShoot.address}</p>
             <p className="mt-2 text-xs font-semibold text-[#2f7898]">{serviceLabels(selectedShoot.services)}</p>
             <p className="mt-2 text-xs leading-relaxed text-[#6d8ca0]">{selectedShoot.notes || "No notes yet."}</p>
