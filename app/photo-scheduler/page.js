@@ -229,7 +229,8 @@ function getWeatherInsight(day, time) {
 }
 
 function propertyDisplayTitle(shoot) {
-  return shoot?.ref ? `${shoot.ref} - ${propertyDisplayTitle(shoot)}` : shoot?.title;
+  if (!shoot) return "";
+  return shoot.ref ? `${shoot.ref} - ${shoot.title}` : shoot.title;
 }
 
 function toggleArrayValue(values = [], value) {
