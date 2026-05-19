@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const COLORS = {
   cream: "#f5f3ee",
@@ -241,11 +241,38 @@ function toggleArrayValue(values = [], value) {
 export default function PhotoSchedulerPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [shoots, setShoots] = useState(initialShoots);
+  const [hasLoadedStoredShoots, setHasLoadedStoredShoots] = useState(false);
   const [selectedShoot, setSelectedShoot] = useState(initialShoots[0]);
   const [modal, setModal] = useState(null);
   const [filter, setFilter] = useState("This week");
   const [bookingSlot, setBookingSlot] = useState(null);
   const [draggedShootId, setDraggedShootId] = useState(null);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("panorama_photo_scheduler_shoots");
+      if (stored) {
+        const parsedShoots = JSON.parse(stored);
+        if (Array.isArray(parsedShoots)) {
+          setShoots(parsedShoots);
+          setSelectedShoot(parsedShoots[0] || null);
+        }
+      }
+    } catch (error) {
+      console.error("Could not load stored photo scheduler shoots", error);
+    } finally {
+      setHasLoadedStoredShoots(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedStoredShoots) return;
+    try {
+      window.localStorage.setItem("panorama_photo_scheduler_shoots", JSON.stringify(shoots));
+    } catch (error) {
+      console.error("Could not save photo scheduler shoots", error);
+    }
+  }, [shoots, hasLoadedStoredShoots]);
 
   const stats = useMemo(() => {
     return {
