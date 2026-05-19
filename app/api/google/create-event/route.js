@@ -186,15 +186,16 @@ export async function POST(request) {
       .eq("id", shootId);
 
     if (shootUpdateError) {
-      return NextResponse.json(
-        {
-          error: "Google event created but failed to update shoot",
-          googleEvent: eventData,
-          details: shootUpdateError,
-        },
-        { status: 500 }
-      );
-    }
+  console.warn("Google event created but shoot update failed:", shootUpdateError);
+
+  return NextResponse.json({
+    success: true,
+    warning: "Google event created but failed to update shoot",
+    googleEventId: eventData.id,
+    htmlLink: eventData.htmlLink,
+    event: eventData,
+  });
+}
 
     return NextResponse.json({
       success: true,
