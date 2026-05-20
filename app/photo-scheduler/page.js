@@ -425,14 +425,37 @@ export default function PhotoSchedulerPage() {
     return () => clearInterval(interval);
   }, [visibleDays]);
 
+  const filteredShoots = useMemo(() => {
+    if (filter === "Today") {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      return shoots.filter((shoot) => !shoot.isoDate || shoot.isoDate === todayIso);
+    }
+
+    if (filter === "This week") {
+      const weekDays = buildCalendarRange("week", new Date()).map((day) => day.isoDate);
+      return shoots.filter((shoot) => !shoot.isoDate || weekDays.includes(shoot.isoDate));
+    }
+
+    if (filter === "This month") {
+      const now = new Date();
+      return shoots.filter((shoot) => {
+        if (!shoot.isoDate) return true;
+        const shootDate = new Date(`${shoot.isoDate}T00:00:00`);
+        return shootDate.getMonth() === now.getMonth() && shootDate.getFullYear() === now.getFullYear();
+      });
+    }
+
+    return shoots;
+  }, [shoots, filter]);
+
   const stats = useMemo(() => {
     return {
-      total: shoots.length,
-      pending: shoots.filter((s) => ["new_request", "needs_confirmation"].includes(s.status)).length,
-      scheduled: shoots.filter((s) => s.status === "scheduled").length,
-      completed: shoots.filter((s) => ["shoot_done", "delivered", "billed"].includes(s.status)).length,
+      total: filteredShoots.length,
+      pending: filteredShoots.filter((s) => ["new_request", "needs_confirmation"].includes(s.status)).length,
+      scheduled: filteredShoots.filter((s) => s.status === "scheduled").length,
+      completed: filteredShoots.filter((s) => ["shoot_done", "delivered", "billed"].includes(s.status)).length,
     };
-  }, [shoots]);
+  }, [filteredShoots]);
 
   function updateSelected(field, value) {
     setSelectedShoot((prev) => {
@@ -595,10 +618,16 @@ export default function PhotoSchedulerPage() {
         }),
       });
 
-      const data = await response.json();
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.warn("Update event response was not JSON", jsonError);
+      }
 
       if (!response.ok) {
-        alert(data.error || "Failed to update Google Calendar event.");
+        alert(data.error || data.details || "Failed to update Google Calendar event.");
         return;
       }
 
@@ -662,12 +691,12 @@ export default function PhotoSchedulerPage() {
           <Topbar activeTab={activeTab} filter={filter} setFilter={setFilter} setModal={setModal} />
 
           {activeTab === "overview" && (
-            <Overview stats={stats} shoots={shoots} setActiveTab={setActiveTab} openShoot={openShoot} />
+            <Overview stats={stats} shoots={filteredShoots} setActiveTab={setActiveTab} openShoot={openShoot} />
           )}
 
           {activeTab === "pipeline" && (
             <Pipeline
-              shoots={shoots}
+              shoots={filteredShoots}
               openShoot={openShoot}
               draggedShootId={draggedShootId}
               setDraggedShootId={setDraggedShootId}
@@ -679,7 +708,7 @@ export default function PhotoSchedulerPage() {
             <CalendarView
               setModal={setModal}
               openShoot={openShoot}
-              shoots={shoots}
+              shoots={filteredShoots}
               openBookingModal={openBookingModal}
               onDropShootToSlot={requestReschedule}
               googleAvailability={googleAvailability}
@@ -695,7 +724,7 @@ export default function PhotoSchedulerPage() {
           )}
 
           {activeTab === "notes" && (
-            <NotesView shoots={shoots} selectedShoot={selectedShoot} setSelectedShoot={setSelectedShoot} updateSelected={updateSelected} />
+            <NotesView shoots={filteredShoots} selectedShoot={selectedShoot} setSelectedShoot={setSelectedShoot} updateSelected={updateSelected} />
           )}
         </section>
       </div>
