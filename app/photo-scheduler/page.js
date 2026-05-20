@@ -57,13 +57,13 @@ const photographers = [
     color: "#123e63",
   },
   {
-    id: "REPLACE_WITH_MARCOS_UUID",
+    id: "9dc6ee67-f9ca-4ae2-aa0d-9c4eb0bf11c2",
     name: "Marcos",
     email: "marcos@panorama.es",
     color: "#2f7898",
   },
   {
-    id: "REPLACE_WITH_CAUANA_UUID",
+    id: "976e90b6-fa1b-4e06-be04-acf358273136",
     name: "Cauana",
     email: "cauana@panorama.es",
     color: "#e7d39a",
@@ -362,7 +362,7 @@ export default function PhotoSchedulerPage() {
           parseStoredShoots(LEGACY_LOCAL_STORAGE_KEY)
         );
 
-        const response = await fetch("/api/photo-property");
+        const response = await fetch("/api/photo-properties");
         const rows = await response.json();
         const supabaseShoots = Array.isArray(rows)
           ? rows.map((row, index) => mapSupabaseRowToShoot(row, index))
