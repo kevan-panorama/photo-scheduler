@@ -406,7 +406,7 @@ export default function PhotoSchedulerPage() {
   const filteredShoots = useMemo(() => {
     if (filter === "Today") {
       const todayIso = new Date().toISOString().slice(0, 10);
-      return shoots.filter((shoot) => !shoot.isoDate || shoot.isoDate === todayIso);
+      return shoots.filter((shoot) => shoot.isoDate === todayIso);
     }
 
     if (filter === "This week") {
@@ -510,9 +510,15 @@ export default function PhotoSchedulerPage() {
       old.map((shoot) => {
         if (shoot.id !== shootId) return shoot;
 
+        const shouldStayOnCalendar = ["scheduled", "shoot_done", "delivered", "billed"].includes(nextStatus);
+
         const updated = {
           ...shoot,
           status: nextStatus,
+          isoDate: shouldStayOnCalendar ? shoot.isoDate : "",
+          day: shouldStayOnCalendar ? shoot.day : "",
+          date: shouldStayOnCalendar ? shoot.date : "Unscheduled",
+          time: shouldStayOnCalendar ? shoot.time : "Pending",
           deliveryLink: nextStatus === "delivered" && !shoot.deliveryLink ? "https://drive.google.com/" : shoot.deliveryLink,
         };
 
@@ -1096,11 +1102,20 @@ function CalendarView({
   const visibleIsoDates = new Set(visibleDays.map((day) => day.isoDate));
 
   function getShootForSlot(calendarDay, time) {
-    return shoots.find((shoot) => shoot.isoDate === calendarDay.isoDate && shoot.time === time);
+    return shoots.find(
+      (shoot) =>
+        shoot.status === "scheduled" &&
+        shoot.isoDate === calendarDay.isoDate &&
+        shoot.time === time
+    );
   }
 
   function getShootsForDay(calendarDay) {
-    return shoots.filter((shoot) => shoot.isoDate === calendarDay.isoDate);
+    return shoots.filter(
+      (shoot) =>
+        shoot.status === "scheduled" &&
+        shoot.isoDate === calendarDay.isoDate
+    );
   }
 
   function busyPhotographersForSlot(calendarDay, time) {
