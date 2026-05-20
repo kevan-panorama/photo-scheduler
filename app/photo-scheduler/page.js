@@ -108,29 +108,7 @@ const pipelineColumns = [
   { key: "billed", label: "Billed" },
 ];
 
-const initialShoots = [
-  {
-    id: 1,
-    ref: "PS-001",
-    title: "Villa Nueva Andalucía",
-    propertyType: "Villa",
-    address: "Nueva Andalucía",
-    googlePin: "https://maps.google.com/?q=Nueva+Andalucia+Marbella",
-    city: "Marbella",
-    agent: "Kevan Martial",
-    photographer: "Marcos",
-    status: "new_request",
-    date: "Unscheduled",
-    day: "",
-    isoDate: "",
-    time: "Pending",
-    weather: "Pending",
-    priority: "High",
-    deliveryLink: "",
-    services: ["photos", "drone"],
-    notes: "Owner prefers late afternoon light.",
-  },
-];
+const initialShoots = [];
 
 const availabilityEvents = [];
 const timeSlots = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"];
@@ -316,7 +294,7 @@ export default function PhotoSchedulerPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [shoots, setShoots] = useState(initialShoots);
   const [hasLoadedStoredShoots, setHasLoadedStoredShoots] = useState(false);
-  const [selectedShoot, setSelectedShoot] = useState(initialShoots[0]);
+  const [selectedShoot, setSelectedShoot] = useState(null);
   const [modal, setModal] = useState(null);
   const [filter, setFilter] = useState("This week");
   const [bookingSlot, setBookingSlot] = useState(null);
@@ -479,7 +457,55 @@ export default function PhotoSchedulerPage() {
     setModal(null);
   }
 
+  async function saveShootToSupabase(shoot) {
+    if (!shoot?.id) return;
+
+    try {
+      const shootDate = shoot.isoDate && shoot.time && shoot.time !== "Pending"
+        ? `${shoot.isoDate}T${shoot.time}:00`
+        : null;
+
+      const response = await fetch("/api/photo-properties", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: shoot.id,
+          title: shoot.title,
+          address: shoot.address,
+          city: shoot.city,
+          shoot_date: shootDate,
+          photographer: shoot.photographer,
+          agent: shoot.agent,
+          status: shoot.status,
+          priority: shoot.priority,
+          weather_summary: shoot.weather,
+          billing_status: shoot.billingStatus || "pending",
+          property_type: shoot.propertyType,
+          google_pin: shoot.googlePin,
+          services: shoot.services,
+          notes: shoot.notes,
+          delivery_link: shoot.deliveryLink,
+          google_event_id: shoot.googleEventId,
+          google_event_link: shoot.googleEventLink,
+          google_calendar_id: shoot.googleCalendarId || "primary",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Failed to save shoot to Supabase", data);
+        alert(data.error || "This change was not saved to Supabase.");
+      }
+    } catch (error) {
+      console.error("Supabase save error", error);
+      alert("This change was not saved to Supabase.");
+    }
+  }
+
   function moveShootToStatus(shootId, nextStatus) {
+    let changedShoot = null;
+
     setShoots((old) =>
       old.map((shoot) => {
         if (shoot.id !== shootId) return shoot;
@@ -490,10 +516,15 @@ export default function PhotoSchedulerPage() {
           deliveryLink: nextStatus === "delivered" && !shoot.deliveryLink ? "https://drive.google.com/" : shoot.deliveryLink,
         };
 
+        changedShoot = updated;
         setSelectedShoot((current) => (current?.id === shootId ? updated : current));
         return updated;
       })
     );
+
+    setTimeout(() => {
+      if (changedShoot) saveShootToSupabase(changedShoot);
+    }, 0);
   }
 
   function createShootFromData(data) {
@@ -723,8 +754,14 @@ export default function PhotoSchedulerPage() {
             />
           )}
 
-          {activeTab === "notes" && (
+          {activeTab === "notes" && selectedShoot && (
             <NotesView shoots={filteredShoots} selectedShoot={selectedShoot} setSelectedShoot={setSelectedShoot} updateSelected={updateSelected} />
+          )}
+
+          {activeTab === "notes" && !selectedShoot && (
+            <div className="rounded-[34px] border border-[#d7e1e7] bg-white p-8 text-sm font-semibold text-[#6d8ca0] shadow-[0_20px_60px_rgba(18,62,99,0.08)]">
+              No properties loaded yet.
+            </div>
           )}
         </section>
       </div>
