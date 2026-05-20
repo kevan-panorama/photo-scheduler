@@ -287,30 +287,83 @@ export default function PhotoSchedulerPage() {
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem("panorama_photo_scheduler_shoots");
-      if (stored) {
-        const parsedShoots = JSON.parse(stored);
-        if (Array.isArray(parsedShoots)) {
-          setShoots(parsedShoots);
-          setSelectedShoot(parsedShoots[0] || null);
-        }
-      }
-    } catch (error) {
-      console.error("Could not load stored photo scheduler shoots", error);
-    } finally {
-      setHasLoadedStoredShoots(true);
-    }
-  }, []);
+    async function loadShootsFromSources() {
+      try {
+        const storedShoots = localStorage.getItem("panorama-photo-shoots");
+        let localShoots = [];
 
-  useEffect(() => {
-    if (!hasLoadedStoredShoots) return;
-    try {
-      window.localStorage.setItem("panorama_photo_scheduler_shoots", JSON.stringify(shoots));
-    } catch (error) {
-      console.error("Could not save photo scheduler shoots", error);
+        if (storedShoots) {
+          try {
+            localShoots = JSON.parse(storedShoots);
+          } catch (error) {
+            console.error("Failed to parse local shoots", error);
+          }
+        }
+
+        const response = await fetch("/api/photo-property");
+        const rows = await response.json();
+
+        let supabaseShoots = [];
+
+        if (Array.isArray(rows)) {
+          supabaseShoots = rows.map((row, index) => {
+            const shootDate = row.shoot_date ? new Date(row.shoot_date) : null;
+
+            return {
+              id: row.id,
+              ref: `PS-${String(index + 1).padStart(3, "0")}`,
+              title: row.title || "Untitled Property",
+              propertyType: "Property",
+              address: row.address || "",
+              googlePin: "",
+              city: row.city || "",
+              agent: row.agent || "",
+              photographer: row.photographer || photographerNames[0],
+              status: row.status || "new_request",
+              date: shootDate
+                ? shootDate.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    day: "2-digit",
+                    month: "short",
+                  })
+                : "Unscheduled",
+              day: shootDate
+                ? shootDate.toLocaleDateString("en-US", {
+                    weekday: "short",
+                  })
+                : "",
+              time: shootDate
+                ? shootDate.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  })
+                : "Pending",
+              weather: row.weather_summary || "Pending",
+              priority: row.priority || "normal",
+              deliveryLink: "",
+              services: ["photos"],
+              notes: "",
+              billingStatus: row.billing_status || "pending",
+            };
+          });
+        }
+
+        const mergedShoots = [...localShoots, ...supabaseShoots];
+
+        if (mergedShoots.length) {
+          setShoots(mergedShoots);
+          setSelectedShoot(mergedShoots[0]);
+        }
+      } catch (error) {
+        console.error("Could not load shoots", error);
+      } finally {
+        setHasLoadedStoredShoots(true);
+      }
     }
-  }, [shoots, hasLoadedStoredShoots]);
+
+    loadShootsFromSources();
+  }, []);
 
   useEffect(() => {
     async function loadAvailability() {
