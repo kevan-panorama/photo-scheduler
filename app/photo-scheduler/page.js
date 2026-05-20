@@ -832,35 +832,40 @@ export default function PhotoSchedulerPage() {
         </BasicModal>
       )}
 
-      
-          <div className="grid gap-3">
-            {["Today", "This week", "This month", "Custom range"].map((item) => (
-              <button
-                key={item}
-                           setCalendarView("day");
-                    setCalendarAnchorDate(new Date());
-                  }
+      {modal === "filter" && (
+  <BasicModal title="Date Filter" onClose={() => setModal(null)}>
+    <div className="grid gap-3">
+      {["Today", "This week", "This month", "Custom range"].map((item) => (
+        <button
+          key={item}
+          onClick={() => {
+            setFilter(item);
 
-                  if (item === "This week") {
-                    setCalendarView("week");
-                    setCalendarAnchorDate(new Date());
-                  }
+            if (item === "Today") {
+              setCalendarView("day");
+              setCalendarAnchorDate(new Date());
+            }
 
-                  if (item === "This month") {
-                    setCalendarView("month");
-                    setCalendarAnchorDate(new Date());
-                  }
+            if (item === "This week") {
+              setCalendarView("week");
+              setCalendarAnchorDate(new Date());
+            }
 
-                  setModal(null);
-                }}
-                className="rounded-2xl border border-[#d7e1e7] bg-white px-4 py-3 text-left text-sm font-semibold text-[#123e63] hover:bg-[#dcebf2]"
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </BasicModal>
-      )}
+            if (item === "This month") {
+              setCalendarView("month");
+              setCalendarAnchorDate(new Date());
+            }
+
+            setModal(null);
+          }}
+          className="rounded-2xl border border-[#d7e1e7] bg-white px-4 py-3 text-left text-sm font-semibold text-[#123e63] hover:bg-[#dcebf2]"
+        >
+          {item}
+        </button>
+      ))}
+    </div>
+  </BasicModal>
+)}
 
       {modal === "details" && selectedShoot && (
         <ShootDetailsDrawer shoot={selectedShoot} onClose={() => setModal(null)} updateSelected={updateSelected} onDelete={deleteShoot} />
