@@ -12,42 +12,48 @@ const COLORS = {
   border: "#d7e1e7",
 };
 
-const agents = [
-  "Alejandro Romera PRRE",
-  "Alex Clover",
-  "Alfonso Muñoz",
-  "Ash Rasoulian",
-  "Beatrice Pittá",
-  "Beatriz Garvayo",
-  "Carolina Alaniz",
-  "Christopher Clover",
-  "C. Lawton",
-  "David Montero",
-  "Dominik Maroszek",
-  "Eva Kiepel",
-  "Evi Tinno",
-  "Gonzalo Ruiz",
-  "Johan Olson",
-  "Jo Borda",
-  "Jovita Vicuña",
-  "Jules Franken",
-  "Katinka Clover",
-  "Kevan Martial",
-  "Lindsey Medina PRRE",
-  "Loli Vazquez",
-  "Lorena Alaniz",
-  "Luca Solari",
-  "Marco Dalli",
-  "Natividad Muñoz",
-  "Samia Mohamdi",
-  "Sarina Garber",
-  "Sean Cannon",
-  "Sian Luijke-Roskott",
-  "Silvina Rigada",
-  "Steve Barre",
-  "Vanesa Mena",
-  "Walter Fernandez",
+const agentContacts = [
+  { name: "Alejandro Romera PRRE", email: "romera@puenteromanorealestate.com", phone: "+34649651757" },
+  { name: "Alex Clover", email: "alex@panorama.es", phone: "+34677548903" },
+  { name: "Alfonso Muñoz", email: "alfonso@panorama.es", phone: "+34606082226" },
+  { name: "Ash Rasoulian", email: "ash@panorama.es", phone: "+34684402790" },
+  { name: "Beatrice Pittá", email: "beatrice@panorama.es", phone: "+34639196674" },
+  { name: "Beatriz Garvayo", email: "garvayo@panorama.es", phone: "+34687916578" },
+  { name: "Carolina Alaniz", email: "carolina@panorama.es", phone: "+34686124709" },
+  { name: "Christopher Clover", email: "clover@panorama.es", phone: "+34609801885" },
+  { name: "C. Lawton", email: "lawton@panorama.es", phone: "+34609344355" },
+  { name: "David Montero", email: "david@panorama.es", phone: "+34615101460" },
+  { name: "Dominik Maroszek", email: "dominik@panorama.es", phone: "+34639161546" },
+  { name: "Eva Kiepel", email: "eva@panorama.es", phone: "+34648136105" },
+  { name: "Evi Tinno", email: "evi@panorama.es", phone: "+34607841921" },
+  { name: "Gonzalo Ruiz", email: "gonzalo@panorama.es", phone: "+34634547716" },
+  { name: "Johan Olson", email: "johan@panorama.es", phone: "+34625617268" },
+  { name: "Jo Borda", email: "jo@panorama.es", phone: "+34664225667" },
+  { name: "Jovita Vicuña", email: "jovita@panorama.es", phone: "+34609947996" },
+  { name: "Jules Franken", email: "jules@panorama.es", phone: "+34629589964" },
+  { name: "Katinka Clover", email: "katinka@panorama.es", phone: "+34630156599" },
+  { name: "Kevan Martial", email: "kevan@panorama.es", phone: "+34611269723" },
+  { name: "Lindsey Medina PRRE", email: "lindsey@puenteromanorealestate.com", phone: "+34687916455" },
+  { name: "Loli Vazquez", email: "loli@panorama.es", phone: "+34629992011" },
+  { name: "Lorena Alaniz", email: "lorena@panorama.es", phone: "+34677293057" },
+  { name: "Luca Solari", email: "luca@panorama.es", phone: "+34650159605" },
+  { name: "Marco Dalli", email: "marco@panorama.es", phone: "+34678648765" },
+  { name: "Natividad Muñoz", email: "natividad@panorama.es", phone: "+34614048389" },
+  { name: "Samia Mohamdi", email: "samia@panorama.es", phone: "+34633881858" },
+  { name: "Sarina Garber", email: "sarina@panorama.es", phone: "+34677548902" },
+  { name: "Sean Cannon", email: "sean@panorama.es", phone: "+34656705781" },
+  { name: "Sian Luijke-Roskott", email: "sianellen@panorama.es", phone: "+34618023939" },
+  { name: "Silvina Rigada", email: "silvina@panorama.es", phone: "+34619675041" },
+  { name: "Steve Barre", email: "steve@panorama.es", phone: "+34659669425" },
+  { name: "Vanesa Mena", email: "vanesa@panorama.es", phone: "+34645695551" },
+  { name: "Walter Fernandez", email: "walter@panorama.es", phone: "+34607846041" },
 ];
+
+const agents = agentContacts.map((agent) => agent.name);
+
+function getAgentByName(name) {
+  return agentContacts.find((agent) => agent.name === name) || null;
+}
 
 const photographers = [
   {
@@ -111,7 +117,16 @@ const pipelineColumns = [
 const initialShoots = [];
 
 const availabilityEvents = [];
-const timeSlots = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"];
+function buildTimeSlots() {
+  const slots = [];
+  for (let hour = 8; hour <= 19; hour += 1) {
+    slots.push(`${String(hour).padStart(2, "0")}:00`);
+    slots.push(`${String(hour).padStart(2, "0")}:30`);
+  }
+  return slots;
+}
+
+const timeSlots = buildTimeSlots();
 const LOCAL_STORAGE_KEY = "panorama_photo_scheduler_shoots";
 const LEGACY_LOCAL_STORAGE_KEY = "panorama-photo-shoots";
 
@@ -510,7 +525,7 @@ export default function PhotoSchedulerPage() {
       old.map((shoot) => {
         if (shoot.id !== shootId) return shoot;
 
-        const shouldStayOnCalendar = ["scheduled", "shoot_done", "delivered", "billed"].includes(nextStatus);
+        const shouldStayOnCalendar = ["needs_confirmation", "scheduled", "shoot_done", "delivered", "billed"].includes(nextStatus);
 
         const updated = {
           ...shoot,
@@ -577,7 +592,7 @@ export default function PhotoSchedulerPage() {
 
         const updated = {
           ...shoot,
-          status: "scheduled",
+          status: "needs_confirmation",
           day: calendarDay.day,
           isoDate: calendarDay.isoDate,
           time,
@@ -679,7 +694,7 @@ export default function PhotoSchedulerPage() {
             time,
             date: buildDateLabel(calendarDay),
             googleEventLink: data.htmlLink || item.googleEventLink,
-            status: "scheduled",
+            status: "needs_confirmation",
           };
 
           setSelectedShoot((current) => (String(current?.id) === String(shoot.id) ? updated : current));
@@ -1104,7 +1119,7 @@ function CalendarView({
   function getShootForSlot(calendarDay, time) {
     return shoots.find(
       (shoot) =>
-        shoot.status === "scheduled" &&
+        ["needs_confirmation", "scheduled"].includes(shoot.status) &&
         shoot.isoDate === calendarDay.isoDate &&
         shoot.time === time
     );
@@ -1113,7 +1128,7 @@ function CalendarView({
   function getShootsForDay(calendarDay) {
     return shoots.filter(
       (shoot) =>
-        shoot.status === "scheduled" &&
+        ["needs_confirmation", "scheduled"].includes(shoot.status) &&
         shoot.isoDate === calendarDay.isoDate
     );
   }
@@ -1270,13 +1285,16 @@ function CalendarView({
                         draggable
                         onDragStart={(event) => event.dataTransfer.setData("text/plain", String(shoot.id))}
                         onClick={() => openShoot(shoot)}
-                        className="w-full cursor-grab rounded-[20px] bg-[#123e63] p-3 text-left text-white shadow-sm transition hover:scale-[1.02] active:cursor-grabbing"
+                        className={`w-full cursor-grab rounded-[20px] p-3 text-left text-white shadow-sm transition hover:scale-[1.02] active:cursor-grabbing ${shoot.status === "needs_confirmation" ? "bg-[#b8872f]" : "bg-[#123e63]"}`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-xs font-bold">{shoot.time}</p>
                           <span className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-semibold">{shoot.photographer}</span>
                         </div>
                         <p className="mt-1 text-sm font-semibold leading-tight">{propertyDisplayTitle(shoot)}</p>
+                        {shoot.status === "needs_confirmation" && (
+                          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/80">Awaiting confirmation</p>
+                        )
                         <p className="mt-1 text-[11px] text-white/70">{serviceLabels(shoot.services)}</p>
                         {shoot.googleEventLink && (
                           <a href={shoot.googleEventLink} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="mt-2 inline-block text-[10px] font-bold text-[#e7d39a] underline">
