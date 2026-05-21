@@ -1293,8 +1293,10 @@ function CalendarView({
                         </div>
                         <p className="mt-1 text-sm font-semibold leading-tight">{propertyDisplayTitle(shoot)}</p>
                         {shoot.status === "needs_confirmation" && (
-                          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/80">Awaiting confirmation</p>
-                        )
+                          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/80">
+                            Awaiting confirmation
+                          </p>
+                        )}
                         <p className="mt-1 text-[11px] text-white/70">{serviceLabels(shoot.services)}</p>
                         {shoot.googleEventLink && (
                           <a href={shoot.googleEventLink} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="mt-2 inline-block text-[10px] font-bold text-[#e7d39a] underline">
