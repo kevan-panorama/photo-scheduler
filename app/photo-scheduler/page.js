@@ -697,9 +697,7 @@ export default function PhotoSchedulerPage() {
     }
 
     const start = new Date(`${calendarDay.isoDate}T${time}:00`);
-    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-
-    try {
+    const end =    try {
       const response = await fetch("/api/google/update-event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -862,10 +860,9 @@ export default function PhotoSchedulerPage() {
             }
 
             const start = new Date(`${form.calendarDay.isoDate}T${form.time}:00`);
-            const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+            const end = new Date(start.getTime() + 90 * 60 * 1000);
 
-            try {
-              const response = await fetch("/api/google/create-event", {
+ = await fetch("/api/google/create-event", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1169,10 +1166,18 @@ function CalendarView({
   function getShootForSlot(calendarDay, time) {
     return shoots.find(
       (shoot) =>
-        ["needs_confirmation", "scheduled"].includes(shoot.status) &&
-        shoot.isoDate === calendarDay.isoDate &&
-        shoot.time === time
-    );
+     time}:00`);
+
+    return shoots.some((shoot) => {
+      if (!["needs_confirmation", "scheduled"].includes(shoot.status)) return false;
+      if (shoot.isoDate !== calendarDay.isoDate) return false;
+      if (!shoot.time || shoot.time === time || shoot.time === "Pending") return false;
+
+      const shootStart = new Date(`${shoot.isoDate}T${shoot.time}:00`);
+      const shootEnd = new Date(shootStart.getTime() + 90 * 60 * 1000);
+
+      return slotStart > shootStart && slotStart < shootEnd;
+    });
   }
 
   function getShootsForDay(calendarDay) {
@@ -1327,35 +1332,31 @@ function CalendarView({
                 const weather = getWeatherInsight(calendarDay.day, time);
                 const busyPhotographers = busyPhotographersForSlot(calendarDay, time);
                 const busyStartsHere = busyPhotographersStartingAtSlot(calendarDay, time);
+                const coveredByShoot = isSlotCoveredByExistingShoot(calendarDay, time);
 
                 return (
                   <div
                     key={`${calendarDay.isoDate}-${time}`}
-                    onDragOver={(event) => {
-                      if (!busyPhotographers.length && !shoot) event.preventDefault();
-                    }}
+          }}
                     onDrop={(event) => {
                       event.preventDefault();
-                      if (busyPhotographers.length || shoot) return;
+                      if (busyPhotographers.length || shoot || coveredByShoot) return;
                       const draggedShootId = event.dataTransfer.getData("text/plain");
                       if (draggedShootId) onDropShootToSlot(draggedShootId, { calendarDay, time });
                     }}
-                    className="relative min-h-[128px] border-l border-t border-[#d7e1e7] bg-white p-2"
+                    className="relp-2"
                   >
                     {shoot ? (
                       <button
                         draggable
-                        onDragStart={(event) => event.dataTransfer.setData("text/plain", String(shoot.id))}
-                        onClick={() => openShoot(shoot)}
-                        className={`w-full cursor-grab rounded-[20px] p-3 text-left text-white shadow-sm transition hover:scale-[1.02] active:cursor-grabbing ${shoot.status === "needs_confirmation" ? "bg-[#b8872f]" : "bg-[#123e63]"}`}
+                        onDragStart={(event) => event.dataTransfer.setData("text/plain", String() => openShoot(shoot)}
+                        className={`absolute left-2 right-2 top-2 z-10 min-h-[290px] cursor-grab rounded-[20px] p-3 text-left text-white shadow-sm transition hover:scale-[1.02] active:cursor-grabbing ${shoot.status === "needs_confirmation" ? "bg-[#b8872f]" : "bg-[#123e63]"}`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-bold">{shoot.time}</p>
+                <p className="text-xs font-bold">{shoot.time}</p>
                           <span className="rounded-full bg-white/15 px-2 py-1 text-[10px] font-semibold">{shoot.photographer}</span>
                         </div>
-                        <p className="mt-1 text-sm font-semibold leading-tight">{propertyDisplayTitle(shoot)}</p>
-                        {shoot.status === "needs_confirmation" && (
-                          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/80">
+                        <p className="mt-1 texse tracking-[0.18em] text-white/80">
                             Awaiting confirmation
                           </p>
                         )}
@@ -1366,14 +1367,18 @@ function CalendarView({
                           </a>
                         )}
                       </button>
-                    ) : busyStartsHere.length ? (
+                    ) : coveredByShoot ? (
+                      <div className="h-full min-h-[106px] w-full rounded-[20px] bg-[#f8fbfc] p-3 text-left text-xs font-semibold text-[#c5d4dc]">
+                        Occupied by booking
+                      </div>
+                    ) : busyStartsHere.leng
                       <div className="w-full rounded-[20px] bg-[#f2d6d2] p-3 text-left">
                         <p className="text-xs font-bold text-[#9f3d2f]">Busy</p>
                         <p className="mt-1 text-sm font-semibold text-[#123e63]">{busyStartsHere.map((photographer) => photographer.photographerName).join(" · ")}</p>
                         <p className="mt-1 text-[11px] text-[#6d8ca0]">Google Calendar blocked</p>
                       </div>
                     ) : busyPhotographers.length ? (
-                      <div className="h-full min-h-[106px] w-full rounded-[20px] bg-[#fff7f5] p-3 text-left text-xs font-semibold text-[#c28b83]">
+                      <div className="h-full min-h] bg-[#fff7f5] p-3 text-left text-xs font-semibold text-[#c28b83]">
                         Blocked by Google Calendar
                       </div>
                     ) : availability ? (
