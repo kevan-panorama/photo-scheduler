@@ -1185,13 +1185,24 @@ function CalendarView({
 
   function busyPhotographersForSlot(calendarDay, time) {
     const slotStart = new Date(`${calendarDay.isoDate}T${time}:00`);
-    const slotEnd = new Date(slotStart.getTime() + 2 * 60 * 60 * 1000);
+    const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
 
     return (googleAvailability || []).filter((photographer) => {
       return (photographer.busy || []).some((busy) => {
         const busyStart = new Date(busy.start);
         const busyEnd = new Date(busy.end);
         return slotStart < busyEnd && slotEnd > busyStart;
+      });
+    });
+  }
+
+  function busyPhotographersStartingAtSlot(calendarDay, time) {
+    const slotStart = new Date(`${calendarDay.isoDate}T${time}:00`);
+
+    return (googleAvailability || []).filter((photographer) => {
+      return (photographer.busy || []).some((busy) => {
+        const busyStart = new Date(busy.start);
+        return busyStart.getTime() === slotStart.getTime();
       });
     });
   }
@@ -1315,6 +1326,7 @@ function CalendarView({
                 const availability = availabilityEvents.find((event) => event.day === calendarDay.day && event.time === time);
                 const weather = getWeatherInsight(calendarDay.day, time);
                 const busyPhotographers = busyPhotographersForSlot(calendarDay, time);
+                const busyStartsHere = busyPhotographersStartingAtSlot(calendarDay, time);
 
                 return (
                   <div
@@ -1354,11 +1366,15 @@ function CalendarView({
                           </a>
                         )}
                       </button>
-                    ) : busyPhotographers.length ? (
+                    ) : busyStartsHere.length ? (
                       <div className="w-full rounded-[20px] bg-[#f2d6d2] p-3 text-left">
                         <p className="text-xs font-bold text-[#9f3d2f]">Busy</p>
-                        <p className="mt-1 text-sm font-semibold text-[#123e63]">{busyPhotographers.map((photographer) => photographer.photographerName).join(" · ")}</p>
+                        <p className="mt-1 text-sm font-semibold text-[#123e63]">{busyStartsHere.map((photographer) => photographer.photographerName).join(" · ")}</p>
                         <p className="mt-1 text-[11px] text-[#6d8ca0]">Google Calendar blocked</p>
+                      </div>
+                    ) : busyPhotographers.length ? (
+                      <div className="h-full min-h-[106px] w-full rounded-[20px] bg-[#fff7f5] p-3 text-left text-xs font-semibold text-[#c28b83]">
+                        Blocked by Google Calendar
                       </div>
                     ) : availability ? (
                       <button
