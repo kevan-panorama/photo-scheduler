@@ -192,12 +192,19 @@ function buildCalendarRange(view, anchorDate) {
   return Array.from({ length: 7 }, (_, index) => toCalendarDay(addDays(monday, index)));
 }
 
+function toLocalIsoDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function toCalendarDay(date) {
   return {
     day: date.toLocaleDateString("en-US", { weekday: "short" }),
     date: date.toLocaleDateString("en-US", { day: "2-digit" }),
     month: date.toLocaleDateString("en-US", { month: "short" }),
-    isoDate: date.toISOString().slice(0, 10),
+    isoDate: toLocalIsoDate(date),
     monthIndex: date.getMonth(),
     year: date.getFullYear(),
   };
@@ -255,7 +262,7 @@ function parseStoredShoots(key) {
 
 function mapSupabaseRowToShoot(row, index) {
   const shootDate = row.shoot_date ? new Date(row.shoot_date) : null;
-  const isoDate = shootDate ? shootDate.toISOString().slice(0, 10) : "";
+  const isoDate = shootDate ? toLocalIsoDate(shootDate) : "";
 
   return {
     id: row.id,
@@ -439,7 +446,7 @@ export default function PhotoSchedulerPage() {
               if (!update) return shoot;
 
               const shootDate = update.shoot_date ? new Date(update.shoot_date) : null;
-              const isoDate = shootDate ? shootDate.toISOString().slice(0, 10) : shoot.isoDate;
+              const isoDate = shootDate ? toLocalIsoDate(shootDate) : shoot.isoDate;
 
               return {
                 ...shoot,
@@ -470,7 +477,7 @@ export default function PhotoSchedulerPage() {
 
   const filteredShoots = useMemo(() => {
     if (filter === "Today") {
-      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayIso = toLocalIsoDate(new Date());
       return shoots.filter((shoot) => shoot.isoDate === todayIso);
     }
 
@@ -710,6 +717,8 @@ export default function PhotoSchedulerPage() {
           googleCalendarId: shoot.googleCalendarId || "primary",
           start: start.toISOString(),
           end: end.toISOString(),
+          localDate: calendarDay.isoDate,
+          localTime: time,
           propertyTitle: shoot.title,
           ref: shoot.ref,
           address: shoot.address,
@@ -873,6 +882,8 @@ export default function PhotoSchedulerPage() {
                   photographerId: photographer.id,
                   start: start.toISOString(),
                   end: end.toISOString(),
+                  localDate: form.calendarDay.isoDate,
+                  localTime: form.time,
                   propertyTitle: selectedShootForBooking.title,
                   ref: selectedShootForBooking.ref,
                   address: selectedShootForBooking.address,
