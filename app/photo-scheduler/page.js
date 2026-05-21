@@ -418,6 +418,56 @@ export default function PhotoSchedulerPage() {
     return () => clearInterval(interval);
   }, [visibleDays]);
 
+  useEffect(() => {
+    async function syncGoogleConfirmations() {
+      try {
+        const response = await fetch("/api/google/sync-confirmations", {
+          method: "POST",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error("Google confirmation sync failed", data);
+          return;
+        }
+
+        if (Array.isArray(data.updated) && data.updated.length) {
+          setShoots((current) =>
+            current.map((shoot) => {
+              const update = data.updated.find((item) => String(item.id) === String(shoot.id));
+              if (!update) return shoot;
+
+              const shootDate = update.shoot_date ? new Date(update.shoot_date) : null;
+              const isoDate = shootDate ? shootDate.toISOString().slice(0, 10) : shoot.isoDate;
+
+              return {
+                ...shoot,
+                status: update.status || shoot.status,
+                isoDate,
+                day: shootDate ? shootDate.toLocaleDateString("en-US", { weekday: "short" }) : shoot.day,
+                date: isoDate ? formatDateLabel(isoDate) : shoot.date,
+                time: shootDate
+                  ? shootDate.toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    })
+                  : shoot.time,
+              };
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Google confirmation sync error", error);
+      }
+    }
+
+    syncGoogleConfirmations();
+    const interval = setInterval(syncGoogleConfirmations, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const filteredShoots = useMemo(() => {
     if (filter === "Today") {
       const todayIso = new Date().toISOString().slice(0, 10);
