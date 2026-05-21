@@ -1146,6 +1146,7 @@ function Pipeline({ shoots, openShoot, draggedShootId, setDraggedShootId, moveSh
                     onDragStart={() => setDraggedShootId(shoot.id)}
                     onDragEnd={() => setDraggedShootId(null)}
                     onClick={() => openShoot(shoot)}
+                    onConfirm={() => moveShootToStatus(shoot.id, "scheduled")}
                   />
                 ))}
 
@@ -1473,7 +1474,7 @@ function NotesView({ shoots, selectedShoot, setSelectedShoot, updateSelected }) 
   );
 }
 
-function ShootCard({ shoot, onClick, draggable = false, onDragStart, onDragEnd }) {
+function ShootCard({ shoot, onClick, draggable = false, onDragStart, onDragEnd, onConfirm }) {
   return (
     <button draggable={draggable} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onClick} className="w-full cursor-pointer rounded-[26px] border border-[#d7e1e7] bg-white p-4 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg active:cursor-grabbing">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -1496,6 +1497,19 @@ function ShootCard({ shoot, onClick, draggable = false, onDragStart, onDragEnd }
 
       <p className="mt-4 text-xs leading-relaxed text-[#6d8ca0]">Agent: {shoot.agent}</p>
       <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[#6d8ca0]">Notes: {shoot.notes || "No notes yet."}</p>
+
+      {shoot.status === "needs_confirmation" && onConfirm && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onConfirm();
+          }}
+          className="mt-4 w-full rounded-2xl bg-[#123e63] px-3 py-2 text-center text-xs font-bold text-white hover:bg-[#164d73]"
+        >
+          Confirm → Scheduled
+        </button>
+      )}
 
       {shoot.status === "delivered" && shoot.deliveryLink && (
         <a href={shoot.deliveryLink} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="mt-4 block rounded-2xl border border-[#d7e1e7] bg-[#f8fbfc] px-3 py-2 text-center text-xs font-bold text-[#2f7898] hover:bg-[#dcebf2]">
