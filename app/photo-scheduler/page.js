@@ -426,52 +426,34 @@ export default function PhotoSchedulerPage() {
   }, [visibleDays]);
 
   useEffect(() => {
-    async function syncGoogleConfirmations() {
+    async function refreshShootsFromSupabase() {
       try {
-        const response = await fetch("/api/google/sync-confirmations", {
-          method: "POST",
-        });
+        const response = await fetch("/api/photo-properties");
+        const rows = await response.json();
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          console.error("Google confirmation sync failed", data);
+        if (!Array.isArray(rows)) {
+          console.error("Unexpected photo-properties refresh response", rows);
           return;
         }
 
-        if (Array.isArray(data.updated) && data.updated.length) {
-          setShoots((current) =>
-            current.map((shoot) => {
-              const update = data.updated.find((item) => String(item.id) === String(shoot.id));
-              if (!update) return shoot;
+        const supabaseShoots = rows.map((row, index) => mapSupabaseRowToShoot(row, index));
 
-              const shootDate = update.shoot_date ? new Date(update.shoot_date) : null;
-              const isoDate = shootDate ? toLocalIsoDate(shootDate) : shoot.isoDate;
+        setShoots((current) => {
+          const localOnlyShoots = current.filter((shoot) => shoot.source !== "supabase");
+          return mergeShoots(localOnlyShoots, supabaseShoots);
+        });
 
-              return {
-                ...shoot,
-                status: update.status || shoot.status,
-                isoDate,
-                day: shootDate ? shootDate.toLocaleDateString("en-US", { weekday: "short" }) : shoot.day,
-                date: isoDate ? formatDateLabel(isoDate) : shoot.date,
-                time: shootDate
-                  ? shootDate.toLocaleTimeString("en-US", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: false,
-                    })
-                  : shoot.time,
-              };
-            })
-          );
-        }
+        setSelectedShoot((current) => {
+          if (!current) return supabaseShoots[0] || null;
+          return supabaseShoots.find((shoot) => String(shoot.id) === String(current.id)) || current;
+        });
       } catch (error) {
-        console.error("Google confirmation sync error", error);
+        console.error("Could not refresh Supabase shoots", error);
       }
     }
 
-    syncGoogleConfirmations();
-    const interval = setInterval(syncGoogleConfirmations, 60000);
+    refreshShootsFromSupabase();
+    const interval = setInterval(refreshShootsFromSupabase, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -707,12 +689,16 @@ export default function PhotoSchedulerPage() {
     const end = new Date(start.getTime() + 90 * 60 * 1000);
 
     try {
-      const response = await fetch("/api/google/update-event", {
+      const response = await fetch("/api/microsoft/create-booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action: "reschedule",
           shootId: shoot.id,
           photographerId: photographer.id,
+          photographerName: photographer.name,
+          photographerEmail: photographer.email,
+          existingEventId: shoot.googleEventId,
           googleEventId: shoot.googleEventId,
           googleCalendarId: shoot.googleCalendarId || "primary",
           start: start.toISOString(),
@@ -726,6 +712,9 @@ export default function PhotoSchedulerPage() {
           services: shoot.services,
           notes: shoot.notes,
           agent: shoot.agent,
+          agentEmail: getAgentByName(shoot.agent)?.email || "",
+          agentPhone: getAgentByName(shoot.agent)?.phone || "",
+          eventTitle: `Photos - ${shoot.title || "Property"}`,
         }),
       });
 
@@ -738,7 +727,7 @@ export default function PhotoSchedulerPage() {
       }
 
       if (!response.ok) {
-        alert(data.error || data.details || "Failed to update Google Calendar event.");
+        alert(data.error || data.details || "Failed to send Outlook booking update through Microsoft Flow.");
         return;
       }
 
@@ -752,7 +741,7 @@ export default function PhotoSchedulerPage() {
             isoDate: calendarDay.isoDate,
             time,
             date: buildDateLabel(calendarDay),
-            googleEventLink: data.htmlLink || item.googleEventLink,
+            googleEventLink: data.outlookEventLink || data.htmlLink || data.flowResponse?.webLink || item.googleEventLink,
             status: "needs_confirmation",
           };
 
@@ -776,7 +765,7 @@ export default function PhotoSchedulerPage() {
       );
 
       setRescheduleRequest(null);
-      alert("Google Calendar event updated and invitation update sent.");
+      alert("Outlook booking update sent through Microsoft Flow.");
     } catch (error) {
       console.error(error);
       alert("Unexpected reschedule error.");
@@ -874,12 +863,15 @@ export default function PhotoSchedulerPage() {
             const end = new Date(start.getTime() + 90 * 60 * 1000);
 
             try {
-              const response = await fetch("/api/google/create-event", {
+              const response = await fetch("/api/microsoft/create-booking", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                  action: "create",
                   shootId: selectedShootForBooking.id,
                   photographerId: photographer.id,
+                  photographerName: photographer.name,
+                  photographerEmail: photographer.email,
                   start: start.toISOString(),
                   end: end.toISOString(),
                   localDate: form.calendarDay.isoDate,
@@ -891,20 +883,23 @@ export default function PhotoSchedulerPage() {
                   services: selectedShootForBooking.services,
                   notes: selectedShootForBooking.notes,
                   agent: selectedShootForBooking.agent,
+                  agentEmail: getAgentByName(selectedShootForBooking.agent)?.email || "",
+                  agentPhone: getAgentByName(selectedShootForBooking.agent)?.phone || "",
+                  eventTitle: `Photos - ${selectedShootForBooking.title || "Property"}`,
                 }),
               });
 
               const data = await response.json();
 
               if (!response.ok) {
-                alert(data.error || "Failed to create Google Calendar event.");
+                alert(data.error || "Failed to send booking to Microsoft Flow.");
                 return;
               }
 
               scheduleExistingShoot({
                 ...form,
-                googleEventId: data.googleEventId,
-                googleEventLink: data.htmlLink,
+                googleEventId: data.outlookEventId || data.googleEventId || data.flowResponse?.eventId || "",
+                googleEventLink: data.outlookEventLink || data.htmlLink || data.flowResponse?.webLink || "",
               });
 
               setGoogleAvailability((current) =>
@@ -917,7 +912,7 @@ export default function PhotoSchedulerPage() {
                 })
               );
 
-              alert("Google Calendar event created and photographer invited.");
+              alert("Booking sent to Microsoft Flow. The card is now waiting for photographer confirmation.");
             } catch (error) {
               console.error(error);
               alert("Unexpected scheduling error.");
