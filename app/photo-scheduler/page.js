@@ -1532,7 +1532,13 @@ function CalendarView({
                       </button>
                     ) : coveredByShoot ? (
                       <div className="h-full min-h-[106px] w-full rounded-[20px] bg-white p-3 text-left text-xs font-semibold text-[#d7e1e7]">
-                        {clearWeather && <span title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}% · ${clearWeather.temperature ?? "—"}°C`>{weatherIcon(clearWeather)} {clearWeather.totalClouds ?? "—"}%</span>}
+                        {clearWeather && (
+  <span
+    title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}% · ${clearWeather.temperature ?? "—"}°C`}
+  >
+    {weatherIcon(clearWeather)} {clearWeather.totalClouds ?? "—"}%
+  </span>
+)}
                       </div>
                     ) : busyStartsHere.length ? (
                       <div className="w-full rounded-[20px] bg-[#f2d6d2] p-3 text-left">
