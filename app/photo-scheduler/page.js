@@ -676,7 +676,7 @@ export default function PhotoSchedulerPage() {
     setModal("booking");
   }
 
-  function scheduleExistingShoot({ shootId, calendarDay, time, photographer, googleEventId, googleEventLink }) {
+  async function scheduleExistingShoot({ shootId, calendarDay, time, photographer, googleEventId, googleEventLink }) {
     const weatherInsight = getWeatherInsight(calendarDay.day, time);
 
     setShoots((old) =>
@@ -684,19 +684,23 @@ export default function PhotoSchedulerPage() {
         if (String(shoot.id) !== String(shootId)) return shoot;
 
         const updated = {
-          ...shoot,
-          status: "needs_confirmation",
-          day: calendarDay.day,
-          isoDate: calendarDay.isoDate,
-          time,
-          date: buildDateLabel(calendarDay),
-          photographer: photographer || shoot.photographer,
-          weather: weatherInsight ? `${weatherInsight.label} · ${weatherInsight.detail}` : "Forecast pending",
-          googleEventId: googleEventId || shoot.googleEventId,
-          googleCalendarId: shoot.googleCalendarId || "primary",
-          googleEventLink: googleEventLink || shoot.googleEventLink,
-          notes: shoot.notes || `Scheduled from calendar for ${buildDateLabel(calendarDay)} at ${time}.`,
-        };
+  ...shoot,
+  status: "needs_confirmation",
+  day: calendarDay.day,
+  isoDate: calendarDay.isoDate,
+  time,
+  date: buildDateLabel(calendarDay),
+  photographer: photographer || shoot.photographer,
+  weather: weatherInsight ? `${weatherInsight.label} · ${weatherInsight.detail}` : "Forecast pending",
+  googleEventId: googleEventId || shoot.googleEventId,
+  googleCalendarId: shoot.googleCalendarId || "primary",
+  googleEventLink: googleEventLink || shoot.googleEventLink,
+  notes: shoot.notes || `Scheduled from calendar for ${buildDateLabel(calendarDay)} at ${time}.`,
+};
+
+setTimeout(() => {
+  saveShootToSupabase(updated);
+}, 0);
 
         setSelectedShoot(updated);
         return updated;
