@@ -743,7 +743,7 @@ export default function PhotoSchedulerPage() {
     const end = new Date(start.getTime() + 90 * 60 * 1000);
 
     try {
-      const response = await fetch("/api/microsoft/create-booking", {
+      const response = await fetch("/api/calendar/create-booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
