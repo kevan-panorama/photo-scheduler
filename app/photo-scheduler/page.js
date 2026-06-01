@@ -1300,6 +1300,32 @@ function CalendarView({
     return "☀️";
   }
 
+  function getClearOutsideDaySummary(calendarDay) {
+    const dayForecast = (clearOutsideWeather || []).filter((item) => {
+      const hour = Number(item.hour);
+      return item.isoDate === calendarDay.isoDate && hour >= 8 && hour <= 19;
+    });
+
+    if (!dayForecast.length) return null;
+
+    const scoreRank = { Good: 0, OK: 1, Bad: 2 };
+    const sorted = [...dayForecast].sort((a, b) => {
+      const scoreDifference = (scoreRank[a.score] ?? 9) - (scoreRank[b.score] ?? 9);
+      if (scoreDifference !== 0) return scoreDifference;
+      return (a.totalClouds ?? 100) - (b.totalClouds ?? 100);
+    });
+
+    const best = sorted[0];
+    const averageClouds = Math.round(
+      dayForecast.reduce((sum, item) => sum + Number(item.totalClouds || 0), 0) / dayForecast.length
+    );
+
+    return {
+      ...best,
+      averageClouds,
+    };
+  }
+
   function isOutsideMonth(calendarDay) {
     return calendarView === "month" && calendarDay.monthIndex !== calendarAnchorDate.getMonth();
   }
@@ -1359,6 +1385,7 @@ function CalendarView({
           {visibleDays.map((calendarDay) => {
             const dayShoots = getShootsForDay(calendarDay);
             const outside = isOutsideMonth(calendarDay);
+            const dayWeather = getClearOutsideDaySummary(calendarDay);
 
             return (
               <div
@@ -1378,6 +1405,14 @@ function CalendarView({
 
                 <button onClick={() => openBookingModal({ calendarDay, time: "10:00" })} className="mb-2 w-full rounded-2xl border border-dashed border-[#c9dbe5] px-3 py-2 text-left text-[11px] font-semibold text-[#6d8ca0] hover:bg-[#f8fbfc]">
                   + Schedule
+                  {dayWeather && (
+                    <span
+                      className="mt-2 block text-[10px] text-[#6d8ca0]"
+                      title={`Best ${String(dayWeather.hour).padStart(2, "0")}:00 · ${dayWeather.score} · ${dayWeather.totalClouds ?? "—"}% cloud · Avg ${dayWeather.averageClouds}% cloud · Rain ${dayWeather.precipProbability ?? "—"}%`}
+                    >
+                      {weatherIcon(dayWeather)} Best {String(dayWeather.hour).padStart(2, "0")}:00 · {dayWeather.totalClouds ?? "—"}% cloud · {dayWeather.score}
+                    </span>
+                  )}
                 </button>
 
                 <div className="space-y-2">
@@ -1463,11 +1498,7 @@ function CalendarView({
                       </button>
                     ) : coveredByShoot ? (
                       <div className="h-full min-h-[106px] w-full rounded-[20px] bg-white p-3 text-left text-xs font-semibold text-[#d7e1e7]">
-                        {clearWeather && (
-  <span title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}% · ${clearWeather.temperature ?? "—"}°C`}>
-    {weatherIcon(clearWeather)} {clearWeather.totalClouds ?? "—"}%
-  </span>
-)}
+                        {clearWeather && <span title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}% · ${clearWeather.temperature ?? "—"}°C`>{weatherIcon(clearWeather)} {clearWeather.totalClouds ?? "—"}%</span>}
                       </div>
                     ) : busyStartsHere.length ? (
                       <div className="w-full rounded-[20px] bg-[#f2d6d2] p-3 text-left">
