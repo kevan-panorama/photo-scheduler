@@ -323,6 +323,7 @@ export default function PhotoSchedulerPage() {
   const [draggedShootId, setDraggedShootId] = useState(null);
   const [googleAvailability, setGoogleAvailability] = useState([]);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [clearOutsideWeather, setClearOutsideWeather] = useState([]);
   const [calendarView, setCalendarView] = useState("week");
   const [calendarAnchorDate, setCalendarAnchorDate] = useState(new Date());
   const [rescheduleRequest, setRescheduleRequest] = useState(null);
@@ -424,6 +425,25 @@ export default function PhotoSchedulerPage() {
     const interval = setInterval(loadAvailability, 60000);
     return () => clearInterval(interval);
   }, [visibleDays]);
+
+  useEffect(() => {
+    async function loadClearOutsideWeather() {
+      try {
+        const response = await fetch("/api/weather/clearoutside");
+        const data = await response.json();
+
+        if (Array.isArray(data.forecast)) {
+          setClearOutsideWeather(data.forecast);
+        }
+      } catch (error) {
+        console.error("Clear Outside weather load failed", error);
+      }
+    }
+
+    loadClearOutsideWeather();
+    const interval = setInterval(loadClearOutsideWeather, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function refreshShootsFromSupabase() {
@@ -820,6 +840,7 @@ export default function PhotoSchedulerPage() {
               calendarAnchorDate={calendarAnchorDate}
               moveCalendar={moveCalendar}
               setCalendarAnchorDate={setCalendarAnchorDate}
+              clearOutsideWeather={clearOutsideWeather}
             />
           )}
 
@@ -1170,6 +1191,7 @@ function CalendarView({
   calendarAnchorDate,
   moveCalendar,
   setCalendarAnchorDate,
+  clearOutsideWeather,
 }) {
   const visibleIsoDates = new Set(visibleDays.map((day) => day.isoDate));
 
@@ -1205,28 +1227,77 @@ function CalendarView({
     );
   }
 
+  function slotDateRange(calendarDay, time) {
+    const start = new Date(`${calendarDay.isoDate}T${time}:00`);
+    const end = new Date(start.getTime() + 30 * 60 * 1000);
+    return { start, end };
+  }
+
+  function isOwnBookingBusy(calendarDay, time, photographer) {
+    return shoots.some((shoot) => {
+      if (!["needs_confirmation", "scheduled"].includes(shoot.status)) return false;
+      if (shoot.isoDate !== calendarDay.isoDate) return false;
+      if (shoot.photographer !== photographer.photographerName) return false;
+      if (!shoot.time || shoot.time === "Pending") return false;
+
+      const shootStart = new Date(`${shoot.isoDate}T${shoot.time}:00`);
+      const shootEnd = new Date(shootStart.getTime() + 90 * 60 * 1000);
+      const { start: slotStart, end: slotEnd } = slotDateRange(calendarDay, time);
+
+      return slotStart < shootEnd && slotEnd > shootStart;
+    });
+  }
+
   function busyPhotographersForSlot(calendarDay, time) {
-    const slotStart = new Date(`${calendarDay.isoDate}T${time}:00`);
-    const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
+    const { start: slotStart, end: slotEnd } = slotDateRange(calendarDay, time);
 
     return (googleAvailability || []).filter((photographer) => {
       return (photographer.busy || []).some((busy) => {
         const busyStart = new Date(busy.start);
         const busyEnd = new Date(busy.end);
-        return slotStart < busyEnd && slotEnd > busyStart;
+
+        const overlapsThisSlot = slotStart < busyEnd && slotEnd > busyStart;
+        if (!overlapsThisSlot) return false;
+
+        // Do not double-render our own 90-minute photo bookings as external Google busy blocks.
+        // The app booking card already owns that visual block.
+        if (isOwnBookingBusy(calendarDay, time, photographer)) return false;
+
+        return true;
       });
     });
   }
 
   function busyPhotographersStartingAtSlot(calendarDay, time) {
-    const slotStart = new Date(`${calendarDay.isoDate}T${time}:00`);
+    const { start: slotStart, end: slotEnd } = slotDateRange(calendarDay, time);
 
     return (googleAvailability || []).filter((photographer) => {
       return (photographer.busy || []).some((busy) => {
         const busyStart = new Date(busy.start);
-        return busyStart.getTime() === slotStart.getTime();
+        const startsInsideThisSlot = busyStart >= slotStart && busyStart < slotEnd;
+        if (!startsInsideThisSlot) return false;
+
+        // Same rule: external busy blocks only. Our app bookings are rendered by photo_properties.
+        if (isOwnBookingBusy(calendarDay, time, photographer)) return false;
+
+        return true;
       });
     });
+  }
+
+  function getClearOutsideForSlot(calendarDay, time) {
+    const hour = Number(String(time).split(":")[0]);
+    return (clearOutsideWeather || []).find(
+      (item) => item.isoDate === calendarDay.isoDate && Number(item.hour) === hour
+    );
+  }
+
+  function weatherIcon(weather) {
+    if (!weather) return "·";
+    if (weather.precipProbability > 40 || weather.precipType !== "None") return "🌧️";
+    if (weather.totalClouds >= 70) return "☁️";
+    if (weather.totalClouds >= 35) return "⛅";
+    return "☀️";
   }
 
   function isOutsideMonth(calendarDay) {
@@ -1347,6 +1418,7 @@ function CalendarView({
                 const shoot = getShootForSlot(calendarDay, time);
                 const availability = availabilityEvents.find((event) => event.day === calendarDay.day && event.time === time);
                 const weather = getWeatherInsight(calendarDay.day, time);
+                const clearWeather = getClearOutsideForSlot(calendarDay, time);
                 const busyPhotographers = busyPhotographersForSlot(calendarDay, time);
                 const busyStartsHere = busyPhotographersStartingAtSlot(calendarDay, time);
                 const coveredByShoot = isSlotCoveredByExistingShoot(calendarDay, time);
@@ -1390,8 +1462,8 @@ function CalendarView({
                         )}
                       </button>
                     ) : coveredByShoot ? (
-                      <div className="h-full min-h-[106px] w-full rounded-[20px] bg-[#f8fbfc] p-3 text-left text-xs font-semibold text-[#c5d4dc]">
-                        Occupied by booking
+                      <div className="h-full min-h-[106px] w-full rounded-[20px] bg-white p-3 text-left text-xs font-semibold text-[#d7e1e7]">
+                        {clearWeather && <span title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}%`}>{weatherIcon(clearWeather)}</span>}
                       </div>
                     ) : busyStartsHere.length ? (
                       <div className="w-full rounded-[20px] bg-[#f2d6d2] p-3 text-left">
@@ -1415,7 +1487,12 @@ function CalendarView({
                     ) : (
                       <button onClick={() => openBookingModal({ calendarDay, time })} className="h-full min-h-[106px] w-full rounded-[20px] border border-dashed border-transparent p-3 text-left text-xs font-semibold text-[#9ab0bd] transition hover:border-[#c9dbe5] hover:bg-[#f8fbfc] hover:text-[#2f7898]">
                         + Schedule property
-                        {weather && <span className="mt-2 block text-[10px] text-[#6d8ca0]">{weather.score}: {weather.label}</span>}
+                        {clearWeather && (
+                          <span className="mt-2 block text-[13px]" title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}%`}>
+                            {weatherIcon(clearWeather)} <span className="text-[10px] text-[#6d8ca0]">{clearWeather.score}</span>
+                          </span>
+                        )}
+                        {!clearWeather && weather && <span className="mt-2 block text-[10px] text-[#6d8ca0]">{weather.score}: {weather.label}</span>}
                       </button>
                     )}
                   </div>
