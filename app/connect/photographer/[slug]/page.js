@@ -13,8 +13,10 @@ const photographers = {
   },
 };
 
-export default function PhotographerConnectPage({ params }) {
-  const photographer = photographers[params.slug];
+export default async function PhotographerConnectPage({ params }) {
+  const resolvedParams = await params;
+  const slug = String(resolvedParams?.slug || "").toLowerCase();
+  const photographer = photographers[slug];
 
   if (!photographer) {
     return (
