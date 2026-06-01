@@ -1463,7 +1463,7 @@ function CalendarView({
                       </button>
                     ) : coveredByShoot ? (
                       <div className="h-full min-h-[106px] w-full rounded-[20px] bg-white p-3 text-left text-xs font-semibold text-[#d7e1e7]">
-                        {clearWeather && <span title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}%`}>{weatherIcon(clearWeather)}</span>}
+                        {clearWeather && <span title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}% · ${clearWeather.temperature ?? "—"}°C`>{weatherIcon(clearWeather)} {clearWeather.totalClouds ?? "—"}%</span>}
                       </div>
                     ) : busyStartsHere.length ? (
                       <div className="w-full rounded-[20px] bg-[#f2d6d2] p-3 text-left">
@@ -1488,8 +1488,8 @@ function CalendarView({
                       <button onClick={() => openBookingModal({ calendarDay, time })} className="h-full min-h-[106px] w-full rounded-[20px] border border-dashed border-transparent p-3 text-left text-xs font-semibold text-[#9ab0bd] transition hover:border-[#c9dbe5] hover:bg-[#f8fbfc] hover:text-[#2f7898]">
                         + Schedule property
                         {clearWeather && (
-                          <span className="mt-2 block text-[13px]" title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}%`}>
-                            {weatherIcon(clearWeather)} <span className="text-[10px] text-[#6d8ca0]">{clearWeather.score}</span>
+                          <span className="mt-2 block text-[13px]" title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}% · ${clearWeather.temperature ?? "—"}°C`>
+                            {weatherIcon(clearWeather)} <span className="text-[10px] text-[#6d8ca0]">{clearWeather.totalClouds ?? "—"}% cloud · {clearWeather.score}</span>
                           </span>
                         )}
                         {!clearWeather && weather && <span className="mt-2 block text-[10px] text-[#6d8ca0]">{weather.score}: {weather.label}</span>}
