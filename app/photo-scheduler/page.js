@@ -312,6 +312,22 @@ function mergeShoots(localShoots, supabaseShoots) {
   return merged;
 }
 
+function mergeWeatherForecasts(clearOutside = [], openMeteo = []) {
+  const bySlot = new Map();
+
+  openMeteo.forEach((item) => {
+    if (!item?.isoDate || item?.hour === undefined) return;
+    bySlot.set(`${item.isoDate}-${item.hour}`, item);
+  });
+
+  clearOutside.forEach((item) => {
+    if (!item?.isoDate || item?.hour === undefined) return;
+    bySlot.set(`${item.isoDate}-${item.hour}`, item);
+  });
+
+  return Array.from(bySlot.values());
+}
+
 export default function PhotoSchedulerPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [shoots, setShoots] = useState(initialShoots);
@@ -324,6 +340,7 @@ export default function PhotoSchedulerPage() {
   const [googleAvailability, setGoogleAvailability] = useState([]);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [clearOutsideWeather, setClearOutsideWeather] = useState([]);
+  const [openMeteoWeather, setOpenMeteoWeather] = useState([]);
   const [calendarView, setCalendarView] = useState("week");
   const [calendarAnchorDate, setCalendarAnchorDate] = useState(new Date());
   const [rescheduleRequest, setRescheduleRequest] = useState(null);
@@ -331,6 +348,11 @@ export default function PhotoSchedulerPage() {
   const visibleDays = useMemo(
     () => buildCalendarRange(calendarView, calendarAnchorDate),
     [calendarView, calendarAnchorDate]
+  );
+
+  const mergedWeatherForecast = useMemo(
+    () => mergeWeatherForecasts(clearOutsideWeather, openMeteoWeather),
+    [clearOutsideWeather, openMeteoWeather]
   );
 
   const calendarTitle = useMemo(() => {
@@ -427,21 +449,33 @@ export default function PhotoSchedulerPage() {
   }, [visibleDays]);
 
   useEffect(() => {
-    async function loadClearOutsideWeather() {
+    async function loadWeatherForecasts() {
       try {
-        const response = await fetch("/api/weather/clearoutside");
-        const data = await response.json();
+        const [clearResponse, openMeteoResponse] = await Promise.allSettled([
+          fetch("/api/weather/clearoutside"),
+          fetch("/api/weather/open-meteo"),
+        ]);
 
-        if (Array.isArray(data.forecast)) {
-          setClearOutsideWeather(data.forecast);
+        if (clearResponse.status === "fulfilled") {
+          const clearData = await clearResponse.value.json();
+          if (Array.isArray(clearData.forecast)) {
+            setClearOutsideWeather(clearData.forecast);
+          }
+        }
+
+        if (openMeteoResponse.status === "fulfilled") {
+          const openData = await openMeteoResponse.value.json();
+          if (Array.isArray(openData.forecast)) {
+            setOpenMeteoWeather(openData.forecast);
+          }
         }
       } catch (error) {
-        console.error("Clear Outside weather load failed", error);
+        console.error("Weather forecast load failed", error);
       }
     }
 
-    loadClearOutsideWeather();
-    const interval = setInterval(loadClearOutsideWeather, 60 * 60 * 1000);
+    loadWeatherForecasts();
+    const interval = setInterval(loadWeatherForecasts, 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -840,7 +874,7 @@ export default function PhotoSchedulerPage() {
               calendarAnchorDate={calendarAnchorDate}
               moveCalendar={moveCalendar}
               setCalendarAnchorDate={setCalendarAnchorDate}
-              clearOutsideWeather={clearOutsideWeather}
+              clearOutsideWeather={mergedWeatherForecast}
             />
           )}
 
@@ -1498,13 +1532,7 @@ function CalendarView({
                       </button>
                     ) : coveredByShoot ? (
                       <div className="h-full min-h-[106px] w-full rounded-[20px] bg-white p-3 text-left text-xs font-semibold text-[#d7e1e7]">
-                        {clearWeather && (
-  <span
-    title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}% · ${clearWeather.temperature ?? "—"}°C`}
-  >
-    {weatherIcon(clearWeather)} {clearWeather.totalClouds ?? "—"}%
-  </span>
-)}
+                        {clearWeather && <span title={`${clearWeather.score} · Clouds ${clearWeather.totalClouds}% · Rain ${clearWeather.precipProbability}% · ${clearWeather.temperature ?? "—"}°C`>{weatherIcon(clearWeather)} {clearWeather.totalClouds ?? "—"}%</span>}
                       </div>
                     ) : busyStartsHere.length ? (
                       <div className="w-full rounded-[20px] bg-[#f2d6d2] p-3 text-left">
