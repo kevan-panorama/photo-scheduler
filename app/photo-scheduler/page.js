@@ -391,7 +391,13 @@ export default function PhotoSchedulerPage() {
           ? rows.map((row, index) => mapSupabaseRowToShoot(row, index))
           : [];
 
-        const mergedShoots = mergeShoots(localShoots, supabaseShoots);
+        const supabaseIds = new Set(supabaseShoots.map((shoot) => String(shoot.id)));
+
+const localShootsWithoutSupabaseCopies = localShoots.filter(
+  (shoot) => !supabaseIds.has(String(shoot.id))
+);
+
+const mergedShoots = mergeShoots(supabaseShoots, localShootsWithoutSupabaseCopies);
 
         if (mergedShoots.length) {
           setShoots(mergedShoots);
@@ -411,7 +417,7 @@ export default function PhotoSchedulerPage() {
     if (!hasLoadedStoredShoots) return;
 
     try {
-      const localOnlyShoots = shoots.filter((shoot) => shoot.source !== "supabase");
+      const localOnlyShoots = shoots.filter((shoot) => shoot.source === "local");
       window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localOnlyShoots));
     } catch (error) {
       console.error("Could not save local photo scheduler shoots", error);
@@ -493,9 +499,14 @@ export default function PhotoSchedulerPage() {
         const supabaseShoots = rows.map((row, index) => mapSupabaseRowToShoot(row, index));
 
         setShoots((current) => {
-          const localOnlyShoots = current.filter((shoot) => shoot.source !== "supabase");
-          return mergeShoots(localOnlyShoots, supabaseShoots);
-        });
+  const supabaseIds = new Set(supabaseShoots.map((shoot) => String(shoot.id)));
+
+  const localOnlyShoots = current.filter(
+    (shoot) => shoot.source === "local" && !supabaseIds.has(String(shoot.id))
+  );
+
+  return mergeShoots(supabaseShoots, localOnlyShoots);
+});
 
         setSelectedShoot((current) => {
           if (!current) return supabaseShoots[0] || null;
