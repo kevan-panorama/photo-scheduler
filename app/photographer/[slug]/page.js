@@ -37,7 +37,9 @@ function formatTime(value) {
 }
 
 export default function PhotographerPortalPage({ params }) {
-  const slug = String(params?.slug || "").toLowerCase();
+  console.log("PARAMS:", params);
+
+const slug = String(params?.slug || "").toLowerCase();
   const photographer = photographers[slug];
 
   const [properties, setProperties] = useState([]);
