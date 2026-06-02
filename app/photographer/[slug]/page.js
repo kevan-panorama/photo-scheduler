@@ -37,18 +37,27 @@ function formatTime(value) {
 }
 
 export default function PhotographerPortalPage({ params }) {
-  console.log("PARAMS:", params);
-
-const slug = String(params?.slug || "").toLowerCase();
-  const photographer = photographers[slug];
-
+  const [slug, setSlug] = useState("");
   const [properties, setProperties] = useState([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
   const [deliveryLink, setDeliveryLink] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    async function resolveParams() {
+      const resolvedParams = await params;
+      setSlug(String(resolvedParams?.slug || "").toLowerCase());
+    }
+
+    resolveParams();
+  }, [params]);
+
+  const photographer = slug ? photographers[slug] : null;
+
   async function loadProperties() {
+    if (!photographer) return;
+
     try {
       setIsLoading(true);
 
@@ -63,7 +72,7 @@ const slug = String(params?.slug || "").toLowerCase();
       const assigned = data.filter(
         (item) =>
           String(item.photographer || "").toLowerCase() ===
-          String(photographer?.name || "").toLowerCase()
+          String(photographer.name || "").toLowerCase()
       );
 
       setProperties(assigned);
@@ -81,7 +90,6 @@ const slug = String(params?.slug || "").toLowerCase();
 
   useEffect(() => {
     if (!photographer) return;
-
     loadProperties();
   }, [photographer]);
 
@@ -122,7 +130,6 @@ const slug = String(params?.slug || "").toLowerCase();
       }
 
       alert("Delivery submitted. Thank you.");
-
       await loadProperties();
     } catch (error) {
       console.error(error);
@@ -130,6 +137,16 @@ const slug = String(params?.slug || "").toLowerCase();
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (!slug) {
+    return (
+      <main className="min-h-screen bg-[#f5f3ee] p-6 text-[#123e63]">
+        <section className="mx-auto max-w-xl rounded-[34px] bg-white p-8 shadow-xl">
+          <h1 className="text-3xl font-semibold">Loading photographer portal...</h1>
+        </section>
+      </main>
+    );
   }
 
   if (!photographer) {
