@@ -676,36 +676,38 @@ export default function PhotoSchedulerPage() {
     setModal("booking");
   }
 
-  async function scheduleExistingShoot({ shootId, calendarDay, time, photographer, googleEventId, googleEventLink }) {
+  function scheduleExistingShoot({ shootId, calendarDay, time, photographer, googleEventId, googleEventLink }) {
     const weatherInsight = getWeatherInsight(calendarDay.day, time);
+    let changedShoot = null;
 
     setShoots((old) =>
       old.map((shoot) => {
         if (String(shoot.id) !== String(shootId)) return shoot;
 
         const updated = {
-  ...shoot,
-  status: "needs_confirmation",
-  day: calendarDay.day,
-  isoDate: calendarDay.isoDate,
-  time,
-  date: buildDateLabel(calendarDay),
-  photographer: photographer || shoot.photographer,
-  weather: weatherInsight ? `${weatherInsight.label} · ${weatherInsight.detail}` : "Forecast pending",
-  googleEventId: googleEventId || shoot.googleEventId,
-  googleCalendarId: shoot.googleCalendarId || "primary",
-  googleEventLink: googleEventLink || shoot.googleEventLink,
-  notes: shoot.notes || `Scheduled from calendar for ${buildDateLabel(calendarDay)} at ${time}.`,
-};
+          ...shoot,
+          status: "needs_confirmation",
+          day: calendarDay.day,
+          isoDate: calendarDay.isoDate,
+          time,
+          date: buildDateLabel(calendarDay),
+          photographer: photographer || shoot.photographer,
+          weather: weatherInsight ? `${weatherInsight.label} · ${weatherInsight.detail}` : "Forecast pending",
+          googleEventId: googleEventId || shoot.googleEventId,
+          googleCalendarId: shoot.googleCalendarId || "primary",
+          googleEventLink: googleEventLink || shoot.googleEventLink,
+          notes: shoot.notes || `Scheduled from calendar for ${buildDateLabel(calendarDay)} at ${time}.`,
+        };
 
-setTimeout(() => {
-  saveShootToSupabase(updated);
-}, 0);
-
+        changedShoot = updated;
         setSelectedShoot(updated);
         return updated;
       })
     );
+
+    setTimeout(() => {
+      if (changedShoot) saveShootToSupabase(changedShoot);
+    }, 0);
 
     setBookingSlot(null);
     setModal("details");
@@ -785,9 +787,11 @@ setTimeout(() => {
       }
 
       if (!response.ok) {
-        alert(data.error || data.details || "Failed to send Outlook booking update through Microsoft Flow.");
+        alert(data.error || data.details || "Failed to update booking.");
         return;
       }
+
+      let changedShoot = null;
 
       setShoots((old) =>
         old.map((item) => {
@@ -799,14 +803,20 @@ setTimeout(() => {
             isoDate: calendarDay.isoDate,
             time,
             date: buildDateLabel(calendarDay),
+            googleEventId: data.outlookEventId || data.googleEventId || data.flowResponse?.eventId || item.googleEventId,
             googleEventLink: data.outlookEventLink || data.htmlLink || data.flowResponse?.webLink || item.googleEventLink,
             status: "needs_confirmation",
           };
 
+          changedShoot = updated;
           setSelectedShoot((current) => (String(current?.id) === String(shoot.id) ? updated : current));
           return updated;
         })
       );
+
+      setTimeout(() => {
+        if (changedShoot) saveShootToSupabase(changedShoot);
+      }, 0);
 
       setGoogleAvailability((current) =>
         current.map((item) => {
@@ -823,7 +833,7 @@ setTimeout(() => {
       );
 
       setRescheduleRequest(null);
-      alert("Outlook booking update sent through Microsoft Flow.");
+      alert("Booking update sent. The card is now waiting for photographer confirmation.");
     } catch (error) {
       console.error(error);
       alert("Unexpected reschedule error.");
@@ -951,7 +961,7 @@ setTimeout(() => {
               const data = await response.json();
 
               if (!response.ok) {
-                alert(data.error || "Failed to send booking to Microsoft Flow.");
+                alert(data.error || "Failed to send booking.");
                 return;
               }
 
@@ -971,7 +981,7 @@ setTimeout(() => {
                 })
               );
 
-              alert("Booking sent to Microsoft Flow. The card is now waiting for photographer confirmation.");
+              alert("Booking sent. The card is now waiting for photographer confirmation.");
             } catch (error) {
               console.error(error);
               alert("Unexpected scheduling error.");
