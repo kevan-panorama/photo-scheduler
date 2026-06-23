@@ -74,6 +74,12 @@ const photographers = [
     email: "cauana@panorama.es",
     color: "#e7d39a",
   },
+  {
+    id: "32115936-cdc0-4b87-b58c-8d759d5f1fdd",
+    name: "Rafael",
+    email: "xpacio360virtualtours@gmail.com",
+    color: "#8b5cf6",
+  },
 ];
 
 const photographerNames = photographers.map((photographer) => photographer.name);
@@ -88,6 +94,7 @@ const serviceOptions = [
   { key: "photos", label: "Photos" },
   { key: "video", label: "Video" },
   { key: "drone", label: "Drone photos" },
+  { key: "virtual_tour", label: "Virtual Tour 360" },
 ];
 
 const photographerCalendarLinks = {
@@ -217,7 +224,9 @@ function serviceLabels(services = []) {
     .filter(Boolean)
     .join(" · ");
 }
-
+function getBookingDurationMinutes(services = []) {
+  return services.includes("virtual_tour") ? 60 : 90;
+}
 function getWeatherInsight(day, time) {
   return weatherInsights.find((item) => item.day === day && item.time === time);
 }
@@ -757,7 +766,7 @@ const mergedShoots = mergeShoots(supabaseShoots, localShootsWithoutSupabaseCopie
     }
 
     const start = new Date(`${calendarDay.isoDate}T${time}:00`);
-    const end = new Date(start.getTime() + 90 * 60 * 1000);
+    const end = new Date(start.getTime() + getBookingDurationMinutes(shoot.services) * 60 * 1000);
 
     try {
       const response = await fetch("/api/calendar/create-booking", {
@@ -940,7 +949,7 @@ const mergedShoots = mergeShoots(supabaseShoots, localShootsWithoutSupabaseCopie
             }
 
             const start = new Date(`${form.calendarDay.isoDate}T${form.time}:00`);
-            const end = new Date(start.getTime() + 90 * 60 * 1000);
+            const end = new Date(start.getTime() + getBookingDurationMinutes(shoot.services) * 60 * 1000);
 
             try {
               const response = await fetch("/api/calendar/create-booking", {
@@ -1272,7 +1281,7 @@ function CalendarView({
       if (!shoot.time || shoot.time === time || shoot.time === "Pending") return false;
 
       const shootStart = new Date(`${shoot.isoDate}T${shoot.time}:00`);
-      const shootEnd = new Date(shootStart.getTime() + 90 * 60 * 1000);
+      const shootEnd = new Date(shootStart.getTime() + getBookingDurationMinutes(shoot.services) * 60 * 1000);
 
       return slotStart > shootStart && slotStart < shootEnd;
     });
@@ -1300,7 +1309,7 @@ function CalendarView({
       if (!shoot.time || shoot.time === "Pending") return false;
 
       const shootStart = new Date(`${shoot.isoDate}T${shoot.time}:00`);
-      const shootEnd = new Date(shootStart.getTime() + 90 * 60 * 1000);
+      const shootEnd = new Date(shootStart.getTime() + getBookingDurationMinutes(shoot.services) * 60 * 1000);
       const { start: slotStart, end: slotEnd } = slotDateRange(calendarDay, time);
 
       return slotStart < shootEnd && slotEnd > shootStart;
