@@ -952,7 +952,10 @@ const mergedShoots = mergeShoots(supabaseShoots, localShootsWithoutSupabaseCopie
             }
 
             const start = new Date(`${form.calendarDay.isoDate}T${form.time}:00`);
-            const end = new Date(start.getTime() + getBookingDurationMinutes(shoot.services) * 60 * 1000);
+            const end = new Date(
+  start.getTime() +
+    getBookingDurationMinutes(selectedShootForBooking.services) * 60 * 1000
+);
 
             try {
               const response = await fetch("/api/calendar/create-booking", {
