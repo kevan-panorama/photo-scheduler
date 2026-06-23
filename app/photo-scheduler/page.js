@@ -766,7 +766,10 @@ const mergedShoots = mergeShoots(supabaseShoots, localShootsWithoutSupabaseCopie
     }
 
     const start = new Date(`${calendarDay.isoDate}T${time}:00`);
-    const end = new Date(start.getTime() + getBookingDurationMinutes(shoot.services) * 60 * 1000);
+    const end = new Date(
+  start.getTime() +
+    getBookingDurationMinutes(selectedShootForBooking.services) * 60 * 1000
+);
 
     try {
       const response = await fetch("/api/calendar/create-booking", {
@@ -1948,7 +1951,7 @@ function ServiceSelector({ services, onChange }) {
   return (
     <div>
       <span className="mb-2 block text-sm font-semibold text-[#46667b]">What we need to do</span>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {serviceOptions.map((option) => {
           const active = services.includes(option.key);
           return (
