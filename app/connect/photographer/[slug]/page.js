@@ -11,6 +11,10 @@ const photographers = {
     name: "Cauana",
     id: "976e90b6-fa1b-4e06-be04-acf358273136",
   },
+  rafael: {
+    name: "Rafael",
+    id: "32115936-cdc0-4b87-b58c-8d759d5f1fdd",
+  },
 };
 
 export default async function PhotographerConnectPage({ params }) {
